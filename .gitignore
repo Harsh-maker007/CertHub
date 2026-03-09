@@ -1,0 +1,9 @@
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+certhub_users.db
+.streamlit/secrets.toml
