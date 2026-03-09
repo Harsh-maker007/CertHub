@@ -5,15 +5,18 @@ import re
 import sqlite3
 from collections import Counter
 from io import BytesIO
+import secrets
 
 import docx
 import pdfplumber
+import requests
 import streamlit as st
 
 
 APP_NAME = "CertHub"
 DB_PATH = "certhub_users.db"
 RAZORPAY_LINK = "https://razorpay.me/@harshshandilya"
+RAZORPAY_KEY_ID = "rzp_live_RJNwYg2Jx647o8"
 CONTACT_EMAIL = "itscerthub@gmail.com"
 CONTACT_PHONE = "+918603234533"
 CONTACT_TEXT = f"Contact: {CONTACT_EMAIL} | {CONTACT_PHONE}"
@@ -298,11 +301,7 @@ def render_primary_recommendation(recommended):
     c1, c2 = st.columns([1, 1])
     with c1:
         if top_offer_price:
-            st.link_button(
-                f"Pay Now - INR {top_offer_price}",
-                build_pay_link(top_offer_price, top_name),
-                use_container_width=True,
-            )
+            render_payment_action(top_name, top_offer_price, f"recommend_{top_name}")
         else:
             st.link_button("Pay Now", RAZORPAY_LINK, use_container_width=True)
     with c2:
@@ -316,10 +315,73 @@ def get_conn():
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 
-def build_pay_link(amount_inr: int, item_name: str):
-    # Fallback to base Razorpay profile link because dynamic amount URLs differ by account setup.
-    # This avoids BAD_REQUEST_ERROR from invalid path patterns.
-    return RAZORPAY_LINK
+def get_razorpay_credentials():
+    key_id = st.secrets.get("RAZORPAY_KEY_ID", RAZORPAY_KEY_ID)
+    key_secret = st.secrets.get("RAZORPAY_KEY_SECRET", "")
+    return key_id, key_secret
+
+
+def create_razorpay_payment_link(amount_inr: int, item_name: str, user_name: str, user_email: str):
+    key_id, key_secret = get_razorpay_credentials()
+    if not key_id or not key_secret:
+        return None, "Razorpay secret is not configured."
+
+    payload = {
+        "amount": int(amount_inr) * 100,
+        "currency": "INR",
+        "accept_partial": False,
+        "description": f"{APP_NAME} - {item_name}",
+        "reference_id": f"certhub_{secrets.token_hex(6)}",
+        "customer": {
+            "name": user_name or "CertHub User",
+            "email": user_email or CONTACT_EMAIL,
+            "contact": CONTACT_PHONE.replace("+", ""),
+        },
+        "notify": {"sms": True, "email": True},
+        "reminder_enable": True,
+        "notes": {"item": item_name, "amount_inr": str(amount_inr)},
+    }
+
+    try:
+        resp = requests.post(
+            "https://api.razorpay.com/v1/payment_links",
+            auth=(key_id, key_secret),
+            json=payload,
+            timeout=20,
+        )
+        if resp.status_code >= 300:
+            return None, f"Razorpay error: {resp.status_code} - {resp.text[:200]}"
+        data = resp.json()
+        return data.get("short_url"), None
+    except Exception as exc:
+        return None, f"Payment link request failed: {exc}"
+
+
+def render_payment_action(item_name: str, amount_inr: int, button_key: str):
+    if "payment_links" not in st.session_state:
+        st.session_state["payment_links"] = {}
+
+    user = st.session_state.get("auth_user") or {}
+    cached = st.session_state["payment_links"].get(button_key)
+
+    if st.button(f"Pay Now - INR {amount_inr}", use_container_width=True, key=f"pay_btn_{button_key}"):
+        payment_url, error = create_razorpay_payment_link(
+            amount_inr=amount_inr,
+            item_name=item_name,
+            user_name=user.get("name", ""),
+            user_email=user.get("email", ""),
+        )
+        if payment_url:
+            st.session_state["payment_links"][button_key] = payment_url
+            cached = payment_url
+            st.success("Secure payment link created.")
+        else:
+            st.warning(error or "Could not create payment link. Using direct Razorpay profile link.")
+            st.session_state["payment_links"][button_key] = RAZORPAY_LINK
+            cached = RAZORPAY_LINK
+
+    if cached:
+        st.link_button("Open Secure Checkout", cached, use_container_width=True)
 
 
 def init_db():
@@ -649,11 +711,7 @@ def render_service_cards():
         )
         c1, c2 = st.columns([1, 1])
         with c1:
-            st.link_button(
-                f"Pay Now (Spotlight) - INR {focus_service['offer_price']}",
-                build_pay_link(focus_service["offer_price"], focus_service["name"]),
-                use_container_width=True,
-            )
+            render_payment_action(focus_service["name"], focus_service["offer_price"], f"spotlight_{focus_service['name']}")
         with c2:
             st.link_button("Contact Us (Spotlight)", f"mailto:{CONTACT_EMAIL}", use_container_width=True)
 
@@ -674,11 +732,7 @@ def render_service_cards():
             st.caption(f"Best for: {service['best_for']}")
             c1, c2, c3 = st.columns([1, 1, 1])
             with c1:
-                st.link_button(
-                    f"Pay Now - INR {service['offer_price']}",
-                    build_pay_link(service["offer_price"], service["name"]),
-                    use_container_width=True,
-                )
+                render_payment_action(service["name"], service["offer_price"], f"service_{service['name']}")
             with c2:
                 st.link_button(
                     f"Contact Us - {service['name']}",
@@ -704,11 +758,7 @@ def render_notes_store():
                 st.write(f"- {topic}")
             c1, c2 = st.columns([1, 1])
             with c1:
-                st.link_button(
-                    f"Pay Now - INR {note['price_inr']}",
-                    build_pay_link(note["price_inr"], note["title"]),
-                    use_container_width=True,
-                )
+                render_payment_action(note["title"], note["price_inr"], f"note_{note['title']}")
             with c2:
                 st.link_button(
                     f"Contact Us - {note['title']}",
@@ -896,7 +946,19 @@ def main():
         st.subheader("Profile")
         st.write(f"Name: {user['name']}")
         st.write(f"Email: {user['email']}")
-        st.write("Payment Link:")
+        key_id, key_secret = get_razorpay_credentials()
+        st.write("Payment Settings")
+        st.code(f"Razorpay Key ID: {key_id}")
+        if key_secret:
+            st.success("Razorpay secret is configured. Fixed-amount payment links are enabled.")
+        else:
+            st.warning("Razorpay secret is missing. Configure `RAZORPAY_KEY_SECRET` in Streamlit secrets for fixed checkout.")
+            st.code(
+                "[secrets]\n"
+                "RAZORPAY_KEY_ID = \"rzp_live_RJNwYg2Jx647o8\"\n"
+                "RAZORPAY_KEY_SECRET = \"your_live_secret_here\""
+            )
+        st.write("Fallback Payment Link:")
         st.code(RAZORPAY_LINK)
         st.write(CONTACT_TEXT)
 
