@@ -78,8 +78,8 @@ SERVICES = [
         "name": "Portfolio Making",
         "description": "Custom portfolio website, mobile responsive, SEO optimized, professional layout, domain and hosting setup.",
         "best_for": "Missing project visibility and personal branding.",
-        "original_price": 999,
-        "offer_price": 499,
+        "original_price": 499,
+        "offer_price": 199,
         "delivery_time": "24 hrs",
     },
     {
@@ -127,7 +127,7 @@ SERVICES = [
         "description": "Custom UI/UX, backend integration, database setup, hosting deployment.",
         "best_for": "Intermediate profile with deployment-ready project requirement.",
         "original_price": 2999,
-        "offer_price": 1599,
+        "offer_price": 999,
         "delivery_time": "1-2 days",
     },
     {
