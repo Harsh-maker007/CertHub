@@ -22,6 +22,7 @@ CONTACT_PHONE = "+918603234533"
 CONTACT_TEXT = f"Contact: {CONTACT_EMAIL} | {CONTACT_PHONE}"
 
 HEADINGS = [
+    "target job role",
     "name & contact",
     "professional summary",
     "skills",
@@ -32,6 +33,7 @@ HEADINGS = [
 ]
 
 SECTION_ALIASES = {
+    "target job role": ["target", "role", "position", "target role", "job role", "target position"],
     "name & contact": ["name", "contact", "phone", "email", "linkedin", "github"],
     "professional summary": ["professional summary", "summary", "objective", "profile"],
     "skills": ["skills", "technical skills", "core skills", "competencies"],
@@ -49,17 +51,56 @@ STOPWORDS = {
 }
 
 TECH_PATTERNS = [
-    "python", "java", "javascript", "typescript", "sql", "excel", "power bi", "tableau",
-    "aws", "azure", "gcp", "docker", "kubernetes", "linux", "git", "github", "flask",
-    "fastapi", "django", "react", "node", "pandas", "numpy", "scikit-learn",
-    "tensorflow", "pytorch", "nlp", "machine learning", "deep learning", "data analysis",
-    "data visualization", "rest api", "agile", "scrum", "jira", "mongodb", "c++",
-    "dsa", "algorithm", "oop", "html", "css",
+    # Languages
+    "python", "java", "javascript", "typescript", "c++", "c#", "golang", "rust", "php", "ruby", "swift", "kotlin",
+    "r programming", "matlab", "scala", "perl", "bash", "shell", "sql", "plsql", "tsql",
+    # Frontend
+    "react", "vue", "angular", "svelte", "nextjs", "nuxtjs", "html", "css", "sass", "tailwind", "bootstrap",
+    "jquery", "three.js", "d3", "webpack", "vite", "parcel",
+    # Backend
+    "node", "nodejs", "express", "fastapi", "flask", "django", "spring", "springboot", "asp.net", "dotnet",
+    "rails", "laravel", "symfony", "nestjs", "gin", "gorilla", "actix",
+    # Databases
+    "sql", "postgresql", "mysql", "mongodb", "redis", "elasticsearch", "cassandra", "dynamodb", "firestore",
+    "oracle", "sqlite", "mariadb", "couchdb", "neo4j", "graphdb",
+    # Cloud & DevOps
+    "aws", "azure", "gcp", "google cloud", "heroku", "vercel", "netlify", "digitalocean",
+    "docker", "kubernetes", "terraform", "ansible", "jenkins", "gitlab", "github actions", "circleci",
+    "datadog", "prometheus", "grafana", "elk stack", "splunk",
+    # Data & ML
+    "pandas", "numpy", "scikit-learn", "scipy", "matplotlib", "seaborn", "plotly", "tableau", "power bi",
+    "tensorflow", "pytorch", "keras", "xgboost", "lightgbm", "catboost", "nlp", "spacy", "nltk",
+    "machine learning", "deep learning", "neural networks", "cnn", "rnn", "lstm", "transformer",
+    "computer vision", "opencv", "pillow", "data analysis", "data visualization", "data engineering",
+    # Tools & Frameworks
+    "git", "github", "gitlab", "bitbucket", "jira", "confluence", "slack", "figma", "sketch", "adobe xd",
+    "postman", "swagger", "rest api", "graphql", "websockets", "rpc",
+    # Soft Skills (Tech)
+    "agile", "scrum", "kanban", "dsa", "algorithm", "oop", "functional programming", "design patterns",
+    "microservices", "monolithic", "serverless", "rest", "grpc", "message queue", "rabbitmq", "kafka",
+    "cicd", "devops", "site reliability", "sre", "testing", "unit test", "integration test",
+    "tdd", "bdd", "automation", "performance", "optimization", "scalability", "security", "encryption",
+    "oauth", "jwt", "authentication", "authorization", "api design", "system design",
 ]
 
 SOFT_PATTERNS = [
-    "communication", "problem solving", "analytical", "leadership",
-    "collaboration", "stakeholder management", "time management",
+    # Leadership & Management
+    "communication", "leadership", "team lead", "management", "decision making", "strategic thinking",
+    "delegation", "mentoring", "coaching", "stakeholder management", "project management",
+    # Problem Solving & Analysis
+    "problem solving", "analytical", "critical thinking", "creative thinking", "innovation",
+    "root cause analysis", "troubleshooting", "debugging", "research",
+    # Collaboration & Teamwork
+    "collaboration", "teamwork", "cooperation", "interpersonal", "networking", "relationship building",
+    "conflict resolution", "negotiation", "empathy",
+    # Time & Organization
+    "time management", "organization", "planning", "prioritization", "multitasking", "deadline driven",
+    # Communication Skills
+    "presentation", "public speaking", "documentation", "technical writing", "storytelling",
+    "active listening", "written communication", "verbal communication",
+    # Business Skills
+    "business acumen", "customer focus", "user empathy", "market awareness", "sales", "marketing",
+    "cost analysis", "budget", "financial", "roi", "kpi", "metrics",
 ]
 
 ACTION_VERBS = {
@@ -82,7 +123,7 @@ SERVICES = [
         "description": "Custom portfolio website, mobile responsive, SEO optimized, professional layout, domain and hosting setup.",
         "best_for": "Missing project visibility and personal branding.",
         "original_price": 999,
-        "offer_price": 499,
+        "offer_price": 199,
         "delivery_time": "24 hrs",
     },
     {
@@ -130,7 +171,7 @@ SERVICES = [
         "description": "Custom UI/UX, backend integration, database setup, hosting deployment.",
         "best_for": "Intermediate profile with deployment-ready project requirement.",
         "original_price": 2999,
-        "offer_price": 1599,
+        "offer_price": 999,
         "delivery_time": "1-2 days",
     },
     {
@@ -603,25 +644,125 @@ def format_resume(role: str, raw_resume: str, jd_kw: dict):
     return "\n".join(lines).strip()
 
 
+def get_keyword_synonyms() -> dict:
+    """Map keywords to their common variations and synonyms."""
+    return {
+        "machine learning": ["ml", "machine learning", "ai", "artificial intelligence"],
+        "deep learning": ["deep learning", "neural network", "dl"],
+        "data science": ["data science", "data scientist", "analytics"],
+        "rest api": ["rest api", "api", "rest"],
+        "node": ["node", "nodejs", "node.js"],
+        "power bi": ["power bi", "powerbi"],
+        "scikit-learn": ["scikit-learn", "sklearn"],
+        "c++": ["c++", "cpp"],
+        "javascript": ["javascript", "js"],
+        "typescript": ["typescript", "ts"],
+    }
+
+
+def find_keyword_matches(text: str, keywords: list[str], use_synonyms: bool = True) -> list[str]:
+    """Find keyword matches with optional synonym handling."""
+    text_lower = (text or "").lower()
+    matched = []
+    synonyms = get_keyword_synonyms() if use_synonyms else {}
+    
+    for kw in keywords:
+        if kw in text_lower:
+            matched.append(kw)
+        elif use_synonyms and kw in synonyms:
+            for syn in synonyms[kw]:
+                if syn in text_lower and kw not in matched:
+                    matched.append(kw)
+                    break
+    return matched
+
+
+def score_section_quality(section_text: str, section_name: str) -> dict:
+    """Score the quality of a resume section."""
+    text = normalize_space(section_text)
+    if not text:
+        return {"quality_score": 0, "word_count": 0, "has_bullets": False, "has_verbs": False, "has_metrics": False}
+    
+    words = tokenize(text)
+    lines = [l.strip() for l in (section_text or "").splitlines() if l.strip()]
+    bullets = [l for l in lines if l.startswith(("-", "•", "*"))]
+    
+    has_verbs = any(w in ACTION_VERBS for w in words)
+    has_metrics = bool(re.findall(r"\b\d+%?|\$\d+[kKmM]?\b", section_text))
+    
+    quality = 0
+    quality += min(len(words) / 50, 1) * 30 if words else 0
+    quality += 20 if bullets else 0
+    quality += 25 if has_verbs else 0
+    quality += 25 if has_metrics else 0
+    
+    return {
+        "quality_score": round(min(quality, 100), 2),
+        "word_count": len(words),
+        "has_bullets": len(bullets) > 0,
+        "has_verbs": has_verbs,
+        "has_metrics": has_metrics,
+    }
+
+
+def count_skill_variety(skills_text: str) -> dict:
+    """Analyze skill section variety and depth."""
+    if not skills_text:
+        return {"tech_count": 0, "soft_count": 0, "total_unique": 0}
+    
+    text_lower = skills_text.lower()
+    tech_count = sum(1 for tech in TECH_PATTERNS if tech in text_lower)
+    soft_count = sum(1 for soft in SOFT_PATTERNS if soft in text_lower)
+    unique_skills = len(set(tokenize(skills_text)))
+    
+    return {
+        "tech_count": tech_count,
+        "soft_count": soft_count,
+        "total_unique": unique_skills,
+    }
+
+
 def ats_match(resume_text: str, jd_kw: dict):
+    """ULTRA-STRICT ATS matching with severe keyword penalties."""
     resume_lower = (resume_text or "").lower()
     essential = jd_kw["essential"]
     preferred = jd_kw["preferred"]
     important = jd_kw["important"][:20]
 
-    matched_essential = [k for k in essential if k in resume_lower]
-    matched_preferred = [k for k in preferred if k in resume_lower]
-    matched_important = [k for k in important if k in resume_lower]
+    matched_essential = find_keyword_matches(resume_text, essential, use_synonyms=True)
+    matched_preferred = find_keyword_matches(resume_text, preferred, use_synonyms=True)
+    matched_important = find_keyword_matches(resume_text, important, use_synonyms=True)
 
     total = len(essential) * 5 + len(preferred) * 2 + len(important)
     score = (len(matched_essential) * 5) + (len(matched_preferred) * 2) + len(matched_important)
-    pct = round((score / total) * 100, 2) if total else 0.0
-    missing = [k for k in essential if k not in resume_lower]
+    
+    essential_match_ratio = len(matched_essential) / len(essential) if essential else 1.0
+    preferred_match_ratio = len(matched_preferred) / len(preferred) if preferred else 1.0
+    
+    penalty = 0.0
+    if essential_match_ratio < 0.4:
+        penalty += 35
+    elif essential_match_ratio < 0.6:
+        penalty += 25
+    elif essential_match_ratio < 0.8:
+        penalty += 15
+    
+    if preferred_match_ratio < 0.25:
+        penalty += 20
+    elif preferred_match_ratio < 0.5:
+        penalty += 10
+    
+    score_adjusted = max(0, score - penalty)
+    pct = round((score_adjusted / total) * 100, 2) if total else 0.0
+    pct = min(pct, 95)
+    
+    missing = [k for k in essential if k not in find_keyword_matches(resume_text, [k], use_synonyms=True)]
     matched = sorted(set(matched_essential + matched_preferred + matched_important))
     return pct, matched, missing
 
 
 def general_resume_score(resume_text: str):
+    """Strict general resume ATS scoring with rigorous quality checks."""
     sections = split_sections(resume_text)
     present_sections = [h for h in HEADINGS if sections.get(h, "").strip()]
     missing_sections = [h for h in HEADINGS if not sections.get(h, "").strip()]
@@ -630,66 +771,333 @@ def general_resume_score(resume_text: str):
     verb_hits = [w for w in words if w in ACTION_VERBS]
     number_hits = re.findall(r"\b\d+%?|\$\d+[kKmM]?\b", resume_text)
 
+    contact_info = sections.get("name & contact", "").strip()
+    has_contact = bool(contact_info and len(contact_info) > 15)
+    has_email = any(x in contact_info.lower() for x in ["@", "email"])
+    has_phone = any(x in contact_info for x in ["(", "+", "-"] if len(contact_info) > 5)
+    has_links = any(x in contact_info.lower() for x in ["linkedin", "github", "portfolio"])
+    
+    target_role = sections.get("target job role", "").strip()
+    has_target_role = bool(target_role and len(target_role) > 5)
+    
+    summary_info = sections.get("professional summary", "").strip()
+    summary_quality = score_section_quality(summary_info, "professional summary")
+    
+    skills_text = sections.get("skills", "").strip()
+    skills_quality = count_skill_variety(skills_text)
+    skills_count = len(set(tokenize(skills_text)))
+    
+    exp_text = sections.get("experience", "").strip()
+    exp_quality = score_section_quality(exp_text, "experience")
+    exp_bullets = [l.strip() for l in exp_text.splitlines() if l.strip().startswith(("-", "•", "*"))]
+    
+    proj_text = sections.get("projects", "").strip()
+    proj_quality = score_section_quality(proj_text, "projects")
+    proj_bullets = [l.strip() for l in proj_text.splitlines() if l.strip().startswith(("-", "•", "*"))]
+
     score = 0.0
-    score += (len(present_sections) / len(HEADINGS)) * 60
-    score += min(len(verb_hits), 8) / 8 * 20
-    score += min(len(number_hits), 6) / 6 * 20
-    score = round(min(score, 100), 2)
+    penalties = 0.0
+
+    exp_verbs = sum(1 for line in exp_bullets if any(v in line.lower() for v in ACTION_VERBS))
+    exp_metrics = sum(1 for line in exp_bullets if re.search(r"\b\d+%?|\$\d+[kKmM]?\b", line))
+    
+    proj_verbs = sum(1 for line in proj_bullets if any(v in line.lower() for v in ACTION_VERBS))
+    proj_metrics = sum(1 for line in proj_bullets if re.search(r"\b\d+%?|\$\d+[kKmM]?\b", line))
+    
+    edu_text = sections.get("education", "").strip()
+    edu_bullets = [l.strip() for l in edu_text.splitlines() if l.strip()]
+    
+    cert_text = sections.get("certifications", "").strip()
+    
+    contact_quality = sum([has_email, has_phone, has_links])
+
+    section_ratio = len(present_sections) / len(HEADINGS)
+    if section_ratio == 1.0:
+        score += 25
+    elif section_ratio >= 0.85:
+        score += 16
+    elif section_ratio >= 0.71:
+        score += 8
+    elif section_ratio >= 0.57:
+        score += 2
+    else:
+        penalties += 25
+    
+    if len(verb_hits) >= 30:
+        score += 20
+    elif len(verb_hits) >= 25:
+        score += 16
+    elif len(verb_hits) >= 20:
+        score += 12
+    elif len(verb_hits) >= 15:
+        score += 8
+    elif len(verb_hits) >= 10:
+        score += 4
+    else:
+        penalties += 18
+    
+    if len(number_hits) >= 22:
+        score += 20
+    elif len(number_hits) >= 18:
+        score += 16
+    elif len(number_hits) >= 14:
+        score += 12
+    elif len(number_hits) >= 10:
+        score += 8
+    elif len(number_hits) >= 6:
+        score += 4
+    else:
+        penalties += 18
+    
+    if contact_quality == 3 and has_contact:
+        score += 10
+    elif contact_quality == 2 and has_contact:
+        score += 5
+    elif contact_quality >= 1:
+        score += 1
+    else:
+        penalties += 15
+    
+    if summary_quality["word_count"] >= 80 and summary_quality["has_verbs"]:
+        score += 10
+    elif summary_quality["word_count"] >= 60:
+        score += 7
+    elif summary_quality["word_count"] >= 45:
+        score += 4
+    elif summary_quality["word_count"] >= 25:
+        score += 1
+    else:
+        penalties += 8
+    
+    if skills_quality["tech_count"] >= 20 and skills_count >= 30:
+        score += 12
+    elif skills_quality["tech_count"] >= 16 and skills_count >= 24:
+        score += 10
+    elif skills_quality["tech_count"] >= 12 and skills_count >= 18:
+        score += 7
+    elif skills_quality["tech_count"] >= 8 and skills_count >= 12:
+        score += 3
+    else:
+        penalties += 15
+    
+    if len(exp_bullets) >= 5 and exp_quality["quality_score"] >= 85 and exp_verbs >= 4 and exp_metrics >= 3:
+        score += 14
+    elif len(exp_bullets) >= 4 and exp_quality["quality_score"] >= 75 and exp_verbs >= 3 and exp_metrics >= 2:
+        score += 10
+    elif len(exp_bullets) >= 3 and exp_quality["quality_score"] >= 60 and exp_verbs >= 2 and exp_metrics >= 1:
+        score += 6
+    elif len(exp_bullets) >= 2 and exp_quality["quality_score"] >= 40:
+        score += 2
+    else:
+        penalties += 18
+    
+    if len(proj_bullets) >= 4 and proj_quality["quality_score"] >= 85 and proj_verbs >= 3 and proj_metrics >= 2:
+        score += 12
+    elif len(proj_bullets) >= 3 and proj_quality["quality_score"] >= 75 and proj_verbs >= 2 and proj_metrics >= 2:
+        score += 8
+    elif len(proj_bullets) >= 2 and proj_quality["quality_score"] >= 60 and proj_verbs >= 2 and proj_metrics >= 1:
+        score += 5
+    elif len(proj_bullets) >= 2 and proj_quality["quality_score"] >= 40:
+        score += 1
+    else:
+        penalties += 15
+    
+    if len(edu_bullets) >= 1:
+        score += 4
+    else:
+        penalties += 8
+    
+    if cert_text and len(cert_text.strip()) > 10:
+        score += 2
+    
+    if has_target_role:
+        score += 4
+    else:
+        penalties += 12
+    
+    score = max(0, score - penalties)
+    base_percent = round((score / 130) * 100, 2)
+    
+    strictness_multiplier = 1.0
+    if len(present_sections) < 8:
+        strictness_multiplier -= 0.08 * (8 - len(present_sections))
+    if len(verb_hits) < 25:
+        strictness_multiplier -= 0.10
+    if len(number_hits) < 18:
+        strictness_multiplier -= 0.10
+    if contact_quality < 3:
+        strictness_multiplier -= 0.08
+    if len(exp_bullets) < 4 or exp_quality["quality_score"] < 70:
+        strictness_multiplier -= 0.10
+    if skills_quality["tech_count"] < 12 or skills_count < 18:
+        strictness_multiplier -= 0.12
+    if len(proj_bullets) < 2 or proj_quality["quality_score"] < 60:
+        strictness_multiplier -= 0.08
+    if not has_target_role:
+        strictness_multiplier -= 0.10
+    
+    strictness_multiplier = max(0.15, strictness_multiplier)
+    score = round(base_percent * strictness_multiplier, 2)
+    score = min(score, 95)
 
     strengths = []
     gaps = []
     edits = []
 
-    if present_sections:
-        strengths.append(f"Detected ATS sections: {', '.join(present_sections[:6])}.")
-    if verb_hits:
-        strengths.append("Uses action-oriented language in project/experience content.")
-    if number_hits:
-        strengths.append("Includes measurable indicators (numbers/percentages).")
-
-    if missing_sections:
-        gaps.append(f"Missing or weak sections: {', '.join(missing_sections)}.")
-        edits.append(f"Add explicit headings for: {', '.join(missing_sections)}.")
-    if not verb_hits:
-        gaps.append("Limited action verbs in bullets.")
-        edits.append("Start bullets with verbs like Developed, Built, Optimized, Led.")
-    if not number_hits:
-        gaps.append("Impact is not quantified in clear metrics.")
-        edits.append("Add numbers: % improvement, users, response time, or delivery outcomes.")
-
-    edits.extend(
-        [
-            "Keep one-column format and avoid tables, icons, and headers/footers.",
-            "Repeat core tools in both Skills and Experience/Projects sections.",
-            "Keep one page for fresher profile unless experience clearly requires more.",
-        ]
-    )
+    if len(present_sections) == 8:
+        strengths.append("✓ All 8 sections present.")
+    elif len(present_sections) >= 7:
+        strengths.append(f"✓ {len(present_sections)}/8 sections present.")
+    
+    if contact_quality == 3:
+        strengths.append("✓ Complete contact: email, phone, and LinkedIn/GitHub.")
+    
+    if len(verb_hits) >= 20:
+        strengths.append(f"✓ Excellent action verbs: {len(verb_hits)} detected.")
+    elif len(verb_hits) >= 15:
+        strengths.append(f"✓ Good action verbs: {len(verb_hits)} detected.")
+    
+    if len(number_hits) >= 14:
+        strengths.append(f"✓ Strong metrics: {len(number_hits)} quantified.")
+    elif len(number_hits) >= 10:
+        strengths.append(f"✓ Good metrics: {len(number_hits)} quantified.")
+    
+    if skills_quality["tech_count"] >= 10:
+        strengths.append(f"✓ Excellent skills: {skills_quality['tech_count']} tech.")
+    elif skills_quality["tech_count"] >= 7:
+        strengths.append(f"✓ Good skills: {skills_quality['tech_count']} tech.")
+    
+    if summary_quality["word_count"] >= 70:
+        strengths.append("✓ Detailed summary.")
+    
+    if has_target_role:
+        strengths.append("✓ Target role clearly identified.")
+    
+    if len(missing_sections) > 0:
+        missing = [s.title() for s in missing_sections]
+        gaps.append(f"✗ CRITICAL: Missing {len(missing_sections)} sections: {', '.join(missing)}.")
+        edits.append(f"Add ALL missing sections: {', '.join(missing)}.")
+    
+    if contact_quality < 3:
+        gaps.append(f"✗ Incomplete contact: missing {3 - contact_quality} elements.")
+        edits.append("REQUIRED: Email, Phone, LinkedIn URL, GitHub URL.")
+    
+    if len(verb_hits) < 15:
+        gaps.append(f"✗ CRITICAL: Only {len(verb_hits)} verbs (need 25+).")
+        edits.append("Rewrite EVERY bullet: Developed, Built, Architected, Optimized, Led, Increased, Delivered, Achieved, Scaled.")
+    
+    if len(number_hits) < 10:
+        gaps.append(f"✗ CRITICAL: Only {len(number_hits)} metrics (need 18+).")
+        edits.append("Add metrics to EVERY achievement: percentages, dollars, users, features, uptime, speed improvements.")
+    
+    if summary_quality["word_count"] < 60:
+        gaps.append(f"✗ Summary too brief: {summary_quality['word_count']} words (need 80+).")
+        edits.append("Write 80+ word summary: role, 5+ skills, experience level, proven impact.")
+    
+    if not has_target_role:
+        gaps.append("✗ CRITICAL: Target job role missing (reduces precision scoring).")
+        edits.append("Add 'Target Job Role' section at top with specific role (e.g., 'Senior Software Engineer').")
+    
+    if skills_quality["tech_count"] < 8 or skills_count < 12:
+        gaps.append(f"✗ Limited skills: {skills_quality['tech_count']} tech, {skills_count} total (need 12+ tech, 18+ total).")
+        edits.append("List 12+ technical skills, 5+ soft skills: frameworks, tools, languages, platforms.")
+    
+    if len(exp_bullets) < 3 or exp_quality["quality_score"] < 60 or exp_verbs < 2 or exp_metrics < 1:
+        gaps.append(f"✗ Experience weak: {len(exp_bullets)} bullets, {exp_verbs} verbs, {exp_metrics} metrics.")
+        edits.append("Strengthen: 4+ bullets per role, each with verb + metric + impact.")
+    
+    if len(proj_bullets) < 2 or proj_quality["quality_score"] < 60 or proj_verbs < 2:
+        gaps.append(f"✗ Projects underdeveloped: {len(proj_bullets)} bullets.")
+        edits.append("Enhance: 3+ projects with tech stack, role, outcomes, and metrics.")
+    
+    if len(edu_bullets) < 1:
+        gaps.append("✗ Education missing or incomplete.")
+        edits.append("Add: Degree, Institution, Year, GPA (if 3.5+), coursework.")
+    
+    if not edits:
+        edits.extend([
+            "Single-column format only—no tables, icons, graphics.",
+            "Consistent formatting: dates, bullets, spacing, font.",
+            "Test ATS compatibility, avoid image-heavy PDFs.",
+        ])
 
     if not strengths:
-        strengths.append("Resume content exists and can be optimized with ATS structure.")
+        strengths.append("Resume needs major improvements across all areas.")
     if not gaps:
-        gaps.append("No major structural gaps detected in general mode.")
+        gaps.append("No gaps detected.")
 
     return score, strengths[:6], gaps[:6], edits[:7]
 
 
 def recommend_services(score: float, missing_keywords: list[str], resume_text: str):
+    """ULTRA-STRICT service recommendations with aggressive push for Resume Making."""
     recommended = []
     resume_lower = resume_text.lower()
+    sections = split_sections(resume_text)
+    
+    words = tokenize(resume_text)
+    verb_hits = len([w for w in words if w in ACTION_VERBS])
+    number_hits = len(re.findall(r"\b\d+%?|\$\d+[kKmM]?\b", resume_text))
+    
+    skills_quality = count_skill_variety(sections.get("skills", ""))
+    exp_text = sections.get("experience", "").strip()
+    proj_text = sections.get("projects", "").strip()
+    
+    has_portfolio = "portfolio" in resume_lower or ("github" in resume_lower and len(sections.get("projects", "").strip()) > 100)
+    has_good_projects = "projects" in resume_lower and len(proj_text) > 150
+    
+    if score < 30:
+        recommended.append(("Resume Making", "🔴 CRITICAL: Complete overhaul required. Resume fails ATS standards across all areas."))
+    elif score < 45:
+        recommended.append(("Resume Making", "🔴 SEVERE: Major structural issues. Resume needs comprehensive rewrite for ATS compatibility."))
+    elif score < 60:
+        recommended.append(("Resume Making", "🟠 MAJOR: Add all missing sections, increase metrics to 10+, expand skills to 12+ technical."))
+    elif score < 75:
+        recommended.append(("Resume Making", "🟡 IMPROVEMENT: Strengthen verbs to 20+, metrics to 15+, details to all bullets."))
+    elif score < 85:
+        recommended.append(("Resume Making", "🟢 FINAL POLISH: Fine-tune formatting, add more metrics, strengthen technical depth."))
+    
+    if verb_hits < 15:
+        recommended.append(("Resume Making", "CRITICAL: Only {0} action verbs (need 25+). Every bullet must start with: Developed, Built, Optimized, Led, Increased.".format(verb_hits)))
+    
+    if number_hits < 10:
+        recommended.append(("Resume Making", "CRITICAL: Only {0} metrics (need 18+). Add quantification: percentages, dollars, users, speed, team size.".format(number_hits)))
+    
+    if skills_quality["tech_count"] < 10 or len(set(tokenize(sections.get("skills", "")))) < 14:
+        recommended.append(("Resume Making", "URGENT: Technical skills insufficient. List 12+ tech skills, 5+ soft skills—this significantly impacts ATS."))
+    
+    if not has_good_projects:
+        recommended.append(("Portfolio Making", "Portfolio projects critical—resumes with projects score 40% higher. Build 3+ strong projects NOW."))
+    
+    if not has_portfolio:
+        recommended.append(("Portfolio Making", "REQUIRED: Online portfolio is non-negotiable. Showcase projects, increases recruiter visibility by 10x."))
+    
+    if len(missing_keywords) >= 7:
+        recommended.append(("LinkedIn Manager", "CRITICAL: 7+ skill gaps detected. LinkedIn optimization essential—immediate action recommended."))
+    elif len(missing_keywords) >= 5:
+        recommended.append(("LinkedIn Manager", "LinkedIn alignment urgent: {0} key skills missing from profile. Update immediately.".format(len(missing_keywords))))
+    
+    if any(k in missing_keywords for k in ["communication", "presentation", "public speaking", "leadership"]):
+        recommended.append(("Presentation Making", "URGENT: Soft skills gap detected. Project walkthroughs and presentations are deal-breakers in interviews."))
+    
+    if any(k in missing_keywords for k in ["machine learning", "tensorflow", "pytorch", "deep learning", "nlp", "data science"]):
+        recommended.append(("Advanced Project (ML/AI)", "HIGH-VALUE: AI/ML skills missing. Building 1 strong ML project increases competitiveness exponentially."))
+    
+    if score >= 85 and len(recommended) == 0:
+        recommended.append(("Full Functional Website", "Excellent foundation. Build advanced full-stack project to demonstrate production-ready expertise."))
+    elif score >= 75 and len(recommended) <= 2:
+        recommended.append(("Full Functional Website", "Good progress. Full-stack project is critical next step—shows complete development lifecycle."))
+    
+    if not recommended or len(recommended) == 0:
+        if score < 50:
+            recommended.append(("Resume Making", "Resume Making is PRIORITY ONE—all other improvements secondary to fixing resume quality first."))
+        else:
+            recommended.append(("Portfolio Making", "Portfolio projects essential—are your biggest differentiator after resume optimization."))
+    
+    return recommended[:5]
 
-    if score < 60:
-        recommended.append(("Resume Making", "ATS score indicates structure and keyword optimization needs."))
-    if "portfolio" not in resume_lower and ("projects" not in resume_lower or "github" not in resume_lower):
-        recommended.append(("Portfolio Making", "Project visibility and profile branding can be improved."))
-    if len(missing_keywords) >= 4:
-        recommended.append(("LinkedIn Manager", "Profile positioning can be aligned with target role keywords."))
-    if "presentation" in missing_keywords or "communication" in missing_keywords:
-        recommended.append(("Presentation Making", "Project communication support can strengthen interview rounds."))
-    if any(k in missing_keywords for k in ["machine learning", "tensorflow", "pytorch"]):
-        recommended.append(("Advanced Project (ML/AI)", "Advanced project proof can bridge skill gaps."))
-    if not recommended:
-        recommended.append(("Full Functional Website", "Strong portfolio project can increase recruiter confidence."))
-    return recommended[:4]
+
+
 
 
 def render_service_cards():
@@ -768,138 +1176,265 @@ def render_notes_store():
 
 
 def render_auth():
-    st.title(APP_NAME)
-    st.caption("Sign in to access resume checker, services, and notes marketplace.")
+    st.markdown("""
+    <style>
+        .auth-container {
+            background: linear-gradient(135deg, rgba(46,204,113,0.08), rgba(46,204,113,0.02));
+            border: 2px solid rgba(46,204,113,0.2);
+            border-radius: 16px;
+            padding: 32px;
+            margin-top: 20px;
+        }
+        .auth-title {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #2ee06f;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .auth-subtitle {
+            text-align: center;
+            color: #a0b0a8;
+            margin-bottom: 30px;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="auth-title">🎯 CertHub</div>', unsafe_allow_html=True)
+    st.markdown('<div class="auth-subtitle">Your Career Growth Platform</div>', unsafe_allow_html=True)
+    
     render_hero()
-    tabs = st.tabs(["Sign In", "Create Account"])
-
-    with tabs[0]:
+    
+    col_left, col_right = st.columns([1, 1])
+    
+    with col_left:
+        st.markdown("### 🔐 Sign In")
         with st.form("signin_form"):
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Sign In")
+            email = st.text_input("📧 Email", placeholder="your@email.com", label_visibility="collapsed")
+            password = st.text_input("🔒 Password", type="password", placeholder="Enter your password", label_visibility="collapsed")
+            st.markdown("")
+            submit = st.form_submit_button("➜ Sign In", use_container_width=True, type="primary")
+        
         if submit:
             user = authenticate_user(email, password)
             if user:
                 st.session_state["auth_user"] = user
-                st.success("Signed in successfully.")
+                st.success("✅ Signed in successfully!")
                 st.rerun()
             else:
-                st.error("Invalid email or password.")
-
-    with tabs[1]:
+                st.error("❌ Invalid email or password.")
+    
+    with col_right:
+        st.markdown("### ✨ Create Account")
         with st.form("signup_form"):
-            full_name = st.text_input("Full Name")
-            email = st.text_input("Email", key="signup_email")
-            password = st.text_input("Password (min 8 chars)", type="password")
-            submit = st.form_submit_button("Create Account")
+            full_name = st.text_input("👤 Full Name", placeholder="Your full name", label_visibility="collapsed")
+            email = st.text_input("📧 Email", key="signup_email", placeholder="your@email.com", label_visibility="collapsed")
+            password = st.text_input("🔒 Password", type="password", placeholder="Min 8 characters", label_visibility="collapsed")
+            st.markdown("")
+            submit = st.form_submit_button("➜ Create Account", use_container_width=True, type="primary")
+        
         if submit:
             if len(password) < 8:
-                st.error("Password must be at least 8 characters.")
+                st.error("❌ Password must be at least 8 characters.")
             elif not full_name.strip() or not email.strip():
-                st.error("Name and email are required.")
+                st.error("❌ Name and email are required.")
             else:
                 ok, msg = create_user(full_name, email, password)
                 if ok:
-                    st.success(msg)
+                    st.success(f"✅ {msg}")
                 else:
-                    st.error(msg)
+                    st.error(f"❌ {msg}")
 
 
 def render_resume_checker():
-    st.subheader("Resume Checker")
-    st.caption("Upload resume only for general ATS review, or add target role + JD for tailored scoring.")
+    st.markdown("""
+    <style>
+        .score-container {
+            background: linear-gradient(135deg, rgba(46,204,113,0.1), rgba(46,204,113,0.05));
+            border: 2px solid rgba(46,204,113,0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .score-number {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #2ee06f;
+        }
+        .score-label {
+            font-size: 0.9rem;
+            color: #a0b0a8;
+            margin-top: 8px;
+        }
+        .insight-box {
+            background: rgba(15, 61, 43, 0.8);
+            border-left: 4px solid #2ee06f;
+            padding: 14px;
+            margin: 10px 0;
+            border-radius: 6px;
+        }
+        .insight-title {
+            font-weight: 700;
+            color: #2ee06f;
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+        }
+        .insight-item {
+            color: #c0d0c8;
+            font-size: 0.9rem;
+            margin: 6px 0;
+            padding-left: 12px;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("### 📄 Resume Analyzer")
+    st.markdown("*Upload your resume to get AI-powered ATS scoring and actionable feedback*")
 
-    resume_file = st.file_uploader("Upload Resume (PDF, DOCX, TXT)", type=["pdf", "docx", "txt"])
-    with st.expander("Optional targeted mode fields"):
-        job_role = st.text_input("Target Job Role")
-        job_description = st.text_area("Target Job Description", height=180)
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        resume_file = st.file_uploader("📤 Upload Resume", type=["pdf", "docx", "txt"], label_visibility="collapsed")
+    with col2:
+        job_role = st.text_input("🎯 Target Role (optional)", label_visibility="collapsed", placeholder="e.g., Senior Developer")
 
-    run_analysis = st.button("Analyze Resume", type="primary", use_container_width=True)
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        run_analysis = st.button("🔍 Analyze", type="primary", use_container_width=True)
+    
     if not run_analysis:
         return
 
     resume_text = extract_resume_text(resume_file)
     has_role = bool(job_role.strip())
-    has_jd = bool(job_description.strip())
+    job_description = ""
+    has_jd = False
 
     if not resume_file:
-        st.error("Please upload a resume file.")
+        st.error("❌ Please upload a resume file.")
         return
     if not resume_text:
-        st.error("Text extraction failed. Upload a clear PDF, DOCX, or TXT file.")
-        return
-    if has_role != has_jd:
-        st.warning("For targeted scoring, provide both role and job description. Otherwise keep both blank.")
+        st.error("❌ Could not extract text. Try a different file format.")
         return
 
-    if not has_role and not has_jd:
+    if not has_role:
         score, strengths, gaps, edits = general_resume_score(resume_text)
         default_kw = {"essential": [], "preferred": [], "important": TECH_PATTERNS[:8] + SOFT_PATTERNS[:3]}
         rewritten = format_resume("Entry-Level Professional", resume_text, default_kw)
         recs = recommend_services(score, [], resume_text)
 
         render_primary_recommendation(recs)
-        st.metric("General ATS Score", f"{score}%")
-        c1, c2 = st.columns(2)
-        with c1:
-            st.write("Strengths")
+        
+        # Score Display
+        st.markdown(f"""
+        <div class="score-container">
+            <div class="score-number">{score}%</div>
+            <div class="score-label">ATS Compatibility Score</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Results in two columns
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### ✅ Strengths")
             for item in strengths:
-                st.write(f"- {item}")
-            st.write("Gaps")
+                st.markdown(f"""
+                <div class="insight-box">
+                    <div class="insight-item">✓ {item}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("### ⚠️ Gaps")
             for item in gaps:
-                st.write(f"- {item}")
-        with c2:
-            st.write("What to improve")
+                st.markdown(f"""
+                <div class="insight-box" style="border-left-color: #ff9800;">
+                    <div class="insight-item">✗ {item}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("### 💡 What to Improve")
             for item in edits:
-                st.write(f"- {item}")
-            st.write("Recommended services")
-            for name, reason in recs:
-                st.write(f"- {name}: {reason}")
+                st.markdown(f"""
+                <div class="insight-box" style="border-left-color: #ffc107;">
+                    <div class="insight-item">→ {item}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            if recs:
+                st.markdown("### 🎯 Recommended Services")
+                for name, reason in recs:
+                    st.markdown(f"""
+                    <div class="insight-box" style="border-left-color: #2ee06f;">
+                        <div class="insight-title">{name}</div>
+                        <div class="insight-item">{reason}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-        st.subheader("ATS-friendly rewritten resume")
-        st.text_area("Output", rewritten, height=420)
-        st.download_button("Download Rewrite (.txt)", rewritten, file_name="certhub_rewritten_resume.txt")
-        return
-
-    jd_keywords = extract_keywords(job_description)
-    score, matched, missing = ats_match(resume_text, jd_keywords)
-    rewritten = format_resume(job_role.strip(), resume_text, jd_keywords)
-    recs = recommend_services(score, missing, resume_text)
-
-    render_primary_recommendation(recs)
-    st.metric("Targeted ATS Match", f"{score}%")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.write("Essential skills:", ", ".join(jd_keywords["essential"]) if jd_keywords["essential"] else "Not detected clearly.")
-        st.write("Preferred skills:", ", ".join(jd_keywords["preferred"]) if jd_keywords["preferred"] else "Not detected clearly.")
-        st.write("Important keywords/tools:", ", ".join(jd_keywords["important"][:25]) if jd_keywords["important"] else "Not detected clearly.")
-    with c2:
-        st.write("Matched keywords:", ", ".join(matched) if matched else "None")
-        st.write("Missing essential keywords:", ", ".join(missing) if missing else "None")
-
-    st.write("Recommended services")
-    for name, reason in recs:
-        st.write(f"- {name}: {reason}")
-
-    st.subheader("ATS-friendly tailored resume")
-    st.text_area("Output", rewritten, height=420)
-    st.download_button("Download Rewrite (.txt)", rewritten, file_name="certhub_targeted_resume.txt")
+        st.divider()
+        st.markdown("### 📝 ATS-Optimized Resume")
+        st.markdown("*Below is your resume rewritten for maximum ATS compatibility*")
+        st.text_area("", rewritten, height=300, disabled=True, label_visibility="collapsed")
+        
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            st.download_button(
+                "⬇️ Download (.txt)",
+                rewritten,
+                file_name="certhub_optimized_resume.txt",
+                use_container_width=True
+            )
 
 
 def render_dashboard(user):
     render_hero()
-    st.subheader(f"Welcome, {user['name']}")
-    st.write("CertHub provides profile services, notes, and ATS resume optimization in one place.")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.metric("Services", len(SERVICES))
-    with c2:
-        st.metric("Notes", len(NOTES))
-    with c3:
-        st.metric("Payment Gateway", "Razorpay")
-    st.info("Use sidebar to access Resume Checker, Services, and Notes Store.")
-    st.write(CONTACT_TEXT)
+    st.markdown(f"## 👋 Welcome back, {user['name']}!")
+    st.markdown("Your complete career growth platform in one place")
+    
+    st.markdown("---")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(46,204,113,0.15), rgba(46,204,113,0.05)); 
+                    border: 2px solid rgba(46,204,113,0.3); border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: 800; color: #2ee06f;">""" + str(len(SERVICES)) + """</div>
+            <div style="color: #a0b0a8; margin-top: 8px;">Professional Services</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(52,152,219,0.15), rgba(52,152,219,0.05)); 
+                    border: 2px solid rgba(52,152,219,0.3); border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: 800; color: #3498db;">""" + str(len(NOTES)) + """</div>
+            <div style="color: #a0b0a8; margin-top: 8px;">Study Notes</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col3:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(155,89,182,0.15), rgba(155,89,182,0.05)); 
+                    border: 2px solid rgba(155,89,182,0.3); border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: 800; color: #9b59b6;">🚀</div>
+            <div style="color: #a0b0a8; margin-top: 8px;">Payment Ready</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    st.markdown("### 🚀 Quick Actions")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📄 Check Your Resume", use_container_width=True, key="dash_resume"):
+            st.session_state["page"] = "Resume Checker"
+            st.rerun()
+    with col2:
+        if st.button("🛍️ Browse Services", use_container_width=True, key="dash_services"):
+            st.session_state["page"] = "Services"
+            st.rerun()
+    
+    st.markdown("---")
+    st.markdown(f"📞 **{CONTACT_TEXT}**")
 
 
 def main():
