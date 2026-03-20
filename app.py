@@ -17,6 +17,8 @@ RAZORPAY_LINK = "https://razorpay.me/@harshshandilya"
 CONTACT_EMAIL = "itscerthub@gmail.com"
 CONTACT_PHONE = "+918603234533"
 CONTACT_TEXT = f"Contact: {CONTACT_EMAIL} | {CONTACT_PHONE}"
+INDIA_QR_PATH = os.path.join("assets", "india_qr.png")
+MALAYSIA_QR_PATH = os.path.join("assets", "malaysia_qr.png")
 
 HEADINGS = [
     "name & contact",
@@ -298,11 +300,7 @@ def render_primary_recommendation(recommended):
     c1, c2 = st.columns([1, 1])
     with c1:
         if top_offer_price:
-            st.link_button(
-                f"Pay Now - INR {top_offer_price}",
-                build_pay_link(top_offer_price, top_name),
-                use_container_width=True,
-            )
+            render_payment_action(top_name, top_offer_price, f"recommend_{top_name}")
         else:
             st.link_button("Pay Now", RAZORPAY_LINK, use_container_width=True)
     with c2:
@@ -321,6 +319,24 @@ def build_pay_link(amount_inr: int, item_name: str):
     # This avoids BAD_REQUEST_ERROR from invalid path patterns.
     return RAZORPAY_LINK
 
+def render_payment_action(item_name: str, amount_inr: int, button_key: str):
+    user = st.session_state.get("auth_user") or {}
+    payment_country = user.get("country", "Other")
+    if payment_country in {"India", "Malaysia"}:
+        st.markdown("**Scan to Pay**")
+        if payment_country == "India":
+            st.image(INDIA_QR_PATH, use_container_width=True, caption="UPI QR (India)")
+        else:
+            st.image(MALAYSIA_QR_PATH, use_container_width=True, caption="Malaysia National QR")
+        st.caption("After payment, share the transaction ID with support for confirmation.")
+        return
+
+    st.link_button(
+        f"Pay Now - INR {amount_inr}",
+        build_pay_link(amount_inr, item_name),
+        use_container_width=True,
+    )
+
 
 def init_db():
     conn = get_conn()
@@ -332,10 +348,14 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            country TEXT NOT NULL DEFAULT 'Other'
         )
         """
     )
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "country" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN country TEXT NOT NULL DEFAULT 'Other'")
     conn.commit()
     conn.close()
 
@@ -350,14 +370,15 @@ def hash_password(password: str, salt_hex: str | None = None):
     return salt_hex, pw_hash
 
 
-def create_user(full_name: str, email: str, password: str):
+def create_user(full_name: str, email: str, password: str, country: str):
     email = email.strip().lower()
+    country = (country or "Other").strip()
     salt, pw_hash = hash_password(password)
     conn = get_conn()
     try:
         conn.execute(
-            "INSERT INTO users (full_name, email, password_hash, salt, created_at) VALUES (?, ?, ?, ?, ?)",
-            (full_name.strip(), email, pw_hash, salt, datetime.datetime.utcnow().isoformat()),
+            "INSERT INTO users (full_name, email, password_hash, salt, created_at, country) VALUES (?, ?, ?, ?, ?, ?)",
+            (full_name.strip(), email, pw_hash, salt, datetime.datetime.utcnow().isoformat(), country),
         )
         conn.commit()
         return True, "Account created successfully. Please sign in."
@@ -371,16 +392,16 @@ def authenticate_user(email: str, password: str):
     email = email.strip().lower()
     conn = get_conn()
     row = conn.execute(
-        "SELECT id, full_name, email, password_hash, salt FROM users WHERE email = ?",
+        "SELECT id, full_name, email, password_hash, salt, country FROM users WHERE email = ?",
         (email,),
     ).fetchone()
     conn.close()
     if not row:
         return None
-    _, full_name, user_email, stored_hash, salt = row
+    _, full_name, user_email, stored_hash, salt, country = row
     _, candidate_hash = hash_password(password, salt)
     if candidate_hash == stored_hash:
-        return {"name": full_name, "email": user_email}
+        return {"name": full_name, "email": user_email, "country": country or "Other"}
     return None
 
 
@@ -649,10 +670,10 @@ def render_service_cards():
         )
         c1, c2 = st.columns([1, 1])
         with c1:
-            st.link_button(
-                f"Pay Now (Spotlight) - INR {focus_service['offer_price']}",
-                build_pay_link(focus_service["offer_price"], focus_service["name"]),
-                use_container_width=True,
+            render_payment_action(
+                focus_service["name"],
+                focus_service["offer_price"],
+                f"spotlight_{focus_service['name']}",
             )
         with c2:
             st.link_button("Contact Us (Spotlight)", f"mailto:{CONTACT_EMAIL}", use_container_width=True)
@@ -674,11 +695,7 @@ def render_service_cards():
             st.caption(f"Best for: {service['best_for']}")
             c1, c2, c3 = st.columns([1, 1, 1])
             with c1:
-                st.link_button(
-                    f"Pay Now - INR {service['offer_price']}",
-                    build_pay_link(service["offer_price"], service["name"]),
-                    use_container_width=True,
-                )
+                render_payment_action(service["name"], service["offer_price"], f"service_{service['name']}")
             with c2:
                 st.link_button(
                     f"Contact Us - {service['name']}",
@@ -704,11 +721,7 @@ def render_notes_store():
                 st.write(f"- {topic}")
             c1, c2 = st.columns([1, 1])
             with c1:
-                st.link_button(
-                    f"Pay Now - INR {note['price_inr']}",
-                    build_pay_link(note["price_inr"], note["title"]),
-                    use_container_width=True,
-                )
+                render_payment_action(note["title"], note["price_inr"], f"note_{note['title']}")
             with c2:
                 st.link_button(
                     f"Contact Us - {note['title']}",
@@ -742,6 +755,7 @@ def render_auth():
             full_name = st.text_input("Full Name")
             email = st.text_input("Email", key="signup_email")
             password = st.text_input("Password (min 8 chars)", type="password")
+            country = st.selectbox("Country", ["India", "Malaysia", "Other"], index=2)
             submit = st.form_submit_button("Create Account")
         if submit:
             if len(password) < 8:
@@ -749,7 +763,7 @@ def render_auth():
             elif not full_name.strip() or not email.strip():
                 st.error("Name and email are required.")
             else:
-                ok, msg = create_user(full_name, email, password)
+                ok, msg = create_user(full_name, email, password, country)
                 if ok:
                     st.success(msg)
                 else:
