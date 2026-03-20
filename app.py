@@ -20,6 +20,8 @@ RAZORPAY_KEY_ID = "rzp_live_RJNwYg2Jx647o8"
 CONTACT_EMAIL = "itscerthub@gmail.com"
 CONTACT_PHONE = "+918603234533"
 CONTACT_TEXT = f"Contact: {CONTACT_EMAIL} | {CONTACT_PHONE}"
+INDIA_QR_PATH = os.path.join("assets", "india_qr.png")
+MALAYSIA_QR_PATH = os.path.join("assets", "malaysia_qr.png")
 
 HEADINGS = [
     "target job role",
@@ -399,6 +401,17 @@ def create_razorpay_payment_link(amount_inr: int, item_name: str, user_name: str
 
 
 def render_payment_action(item_name: str, amount_inr: int, button_key: str):
+    user = st.session_state.get("auth_user") or {}
+    payment_country = user.get("country", "Other")
+    if payment_country in {"India", "Malaysia"}:
+        st.markdown("**Scan to Pay**")
+        if payment_country == "India":
+            st.image(INDIA_QR_PATH, use_container_width=True, caption="UPI QR (India)")
+        else:
+            st.image(MALAYSIA_QR_PATH, use_container_width=True, caption="Malaysia National QR")
+        st.caption("After payment, share the transaction ID with support for confirmation.")
+        return
+
     if "payment_links" not in st.session_state:
         st.session_state["payment_links"] = {}
 
@@ -435,10 +448,14 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            country TEXT NOT NULL DEFAULT 'Other'
         )
         """
     )
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "country" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN country TEXT NOT NULL DEFAULT 'Other'")
     conn.commit()
     conn.close()
 
@@ -453,14 +470,15 @@ def hash_password(password: str, salt_hex: str | None = None):
     return salt_hex, pw_hash
 
 
-def create_user(full_name: str, email: str, password: str):
+def create_user(full_name: str, email: str, password: str, country: str):
     email = email.strip().lower()
+    country = (country or "Other").strip()
     salt, pw_hash = hash_password(password)
     conn = get_conn()
     try:
         conn.execute(
-            "INSERT INTO users (full_name, email, password_hash, salt, created_at) VALUES (?, ?, ?, ?, ?)",
-            (full_name.strip(), email, pw_hash, salt, datetime.datetime.utcnow().isoformat()),
+            "INSERT INTO users (full_name, email, password_hash, salt, created_at, country) VALUES (?, ?, ?, ?, ?, ?)",
+            (full_name.strip(), email, pw_hash, salt, datetime.datetime.utcnow().isoformat(), country),
         )
         conn.commit()
         return True, "Account created successfully. Please sign in."
@@ -474,16 +492,16 @@ def authenticate_user(email: str, password: str):
     email = email.strip().lower()
     conn = get_conn()
     row = conn.execute(
-        "SELECT id, full_name, email, password_hash, salt FROM users WHERE email = ?",
+        "SELECT id, full_name, email, password_hash, salt, country FROM users WHERE email = ?",
         (email,),
     ).fetchone()
     conn.close()
     if not row:
         return None
-    _, full_name, user_email, stored_hash, salt = row
+    _, full_name, user_email, stored_hash, salt, country = row
     _, candidate_hash = hash_password(password, salt)
     if candidate_hash == stored_hash:
-        return {"name": full_name, "email": user_email}
+        return {"name": full_name, "email": user_email, "country": country or "Other"}
     return None
 
 
@@ -1202,6 +1220,7 @@ def render_auth():
     
     st.markdown('<div class="auth-title">🎯 CertHub</div>', unsafe_allow_html=True)
     st.markdown('<div class="auth-subtitle">Your Career Growth Platform</div>', unsafe_allow_html=True)
+    st.caption("Build: country-select enabled")
     
     render_hero()
     
@@ -1230,6 +1249,7 @@ def render_auth():
             full_name = st.text_input("👤 Full Name", placeholder="Your full name", label_visibility="collapsed")
             email = st.text_input("📧 Email", key="signup_email", placeholder="your@email.com", label_visibility="collapsed")
             password = st.text_input("🔒 Password", type="password", placeholder="Min 8 characters", label_visibility="collapsed")
+            country = st.selectbox("Country", ["India", "Malaysia", "Other"], index=2)
             st.markdown("")
             submit = st.form_submit_button("➜ Create Account", use_container_width=True, type="primary")
         
@@ -1239,7 +1259,7 @@ def render_auth():
             elif not full_name.strip() or not email.strip():
                 st.error("❌ Name and email are required.")
             else:
-                ok, msg = create_user(full_name, email, password)
+                ok, msg = create_user(full_name, email, password, country)
                 if ok:
                     st.success(f"✅ {msg}")
                 else:
