@@ -324,7 +324,7 @@ def build_pay_link(amount_inr: int, item_name: str):
     return RAZORPAY_LINK
 
 
-def send_payment_email(item_name: str, amount_inr: int, user: dict):
+def send_payment_email(item_name: str, amount_inr: int, user: dict, note: str, attachment_file=None):
     smtp_host = st.secrets.get("SMTP_HOST", "")
     smtp_port = int(st.secrets.get("SMTP_PORT", 0) or 0)
     smtp_user = st.secrets.get("SMTP_USER", "")
@@ -334,13 +334,13 @@ def send_payment_email(item_name: str, amount_inr: int, user: dict):
         return False, "Email is not configured. Add SMTP settings in Streamlit secrets."
 
     msg = EmailMessage()
-    msg["Subject"] = f"CertHub payment intent: {item_name}"
+    msg["Subject"] = f"CertHub payment proof: {item_name}"
     msg["From"] = smtp_from
     msg["To"] = NOTIFY_EMAIL
     msg.set_content(
         "\n".join(
             [
-                "A user clicked Pay Now.",
+                note,
                 f"Service/Note: {item_name}",
                 f"Amount (INR): {amount_inr}",
                 f"Name: {user.get('name', 'Unknown')}",
@@ -350,6 +350,14 @@ def send_payment_email(item_name: str, amount_inr: int, user: dict):
             ]
         )
     )
+    if attachment_file is not None:
+        data = attachment_file.getvalue()
+        content_type = attachment_file.type or "application/octet-stream"
+        if "/" in content_type:
+            maintype, subtype = content_type.split("/", 1)
+        else:
+            maintype, subtype = "application", "octet-stream"
+        msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=attachment_file.name)
 
     try:
         if smtp_port == 465:
@@ -403,30 +411,32 @@ def render_payment_action(item_name: str, amount_inr: int, button_key: str):
             st.image(INDIA_QR_PATH, use_container_width=True, caption="UPI QR (India)")
         else:
             st.image(MALAYSIA_QR_PATH, use_container_width=True, caption="Malaysia National QR")
-        st.caption("After payment, share the transaction ID with support for confirmation.")
-        if st.button("I Have Paid", use_container_width=True, key=f"paid_btn_{button_key}"):
-            ok, err = send_payment_email(item_name, amount_inr, user)
-            if ok:
-                st.success("Thanks! We have notified the team.")
+        st.caption("Upload your payment screenshot to notify the team.")
+        proof = st.file_uploader(
+            "Payment Screenshot",
+            type=["png", "jpg", "jpeg", "pdf"],
+            key=f"proof_{button_key}",
+        )
+        txn_id = st.text_input("Transaction ID (optional)", key=f"txn_{button_key}")
+        if st.button("Submit Payment Proof", use_container_width=True, key=f"paid_btn_{button_key}"):
+            if not proof:
+                st.warning("Please upload a payment screenshot.")
             else:
-                st.warning(err or "Could not send notification email.")
+                note = "Payment proof uploaded."
+                if txn_id.strip():
+                    note += f" Transaction ID: {txn_id.strip()}."
+                ok, err = send_payment_email(item_name, amount_inr, user, note, proof)
+                if ok:
+                    st.success("Thanks! We have notified the team.")
+                else:
+                    st.warning(err or "Could not send notification email.")
         return
 
-    if "payment_links" not in st.session_state:
-        st.session_state["payment_links"] = {}
-
-    payment_key = f"paylink_{button_key}"
-    if st.button(f"Pay Now - INR {amount_inr}", use_container_width=True, key=f"pay_btn_{button_key}"):
-        ok, err = send_payment_email(item_name, amount_inr, user)
-        if ok:
-            st.session_state["payment_links"][payment_key] = build_pay_link(amount_inr, item_name)
-            st.success("We notified the team. Continue to checkout.")
-        else:
-            st.warning(err or "Could not send notification email.")
-
-    link = st.session_state.get("payment_links", {}).get(payment_key)
-    if link:
-        st.link_button("Open Checkout", link, use_container_width=True)
+    st.link_button(
+        f"Pay Now - INR {amount_inr}",
+        build_pay_link(amount_inr, item_name),
+        use_container_width=True,
+    )
 
 
 def init_db():
