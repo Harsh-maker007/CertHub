@@ -165,6 +165,7 @@ NOTES = [
     {"title": "MongoDB", "price_inr": 99, "topics": ["MongoDB Fundamentals", "Database Design", "CRUD Operations", "Aggregation Framework", "Indexing & Performance"]},
     {"title": "Machine Learning", "price_inr": 369, "topics": ["ML Fundamentals", "Supervised Learning", "Unsupervised Learning", "Neural Networks", "Model Optimization"]},
 ]
+MALAYSIA_RATE = 0.057  # Rough INR -> MYR display conversion
 
 
 def inject_theme():
@@ -290,13 +291,17 @@ def render_primary_recommendation(recommended):
     top_name, top_reason = recommended[0]
     top_service = next((s for s in SERVICES if s["name"] == top_name), None)
     top_offer_price = top_service["offer_price"] if top_service else None
+    user = st.session_state.get("auth_user") or {}
+    currency = "MYR" if user.get("country") == "Malaysia" else "INR"
+    rate = MALAYSIA_RATE if currency == "MYR" else 1.0
+    display_offer = round(top_offer_price * rate, 2) if top_offer_price else None
     st.markdown(
         f"""
         <div class="recommend-card">
             <div class="recommend-label">Recommended Service For You</div>
             <div class="recommend-main">{top_name}</div>
             <div class="recommend-reason">{top_reason}</div>
-            <div class="recommend-reason"><b>Offer Price:</b> INR {top_offer_price if top_offer_price else 'NA'}</div>
+            <div class="recommend-reason"><b>Offer Price:</b> {currency} {display_offer if display_offer is not None else 'NA'}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -802,14 +807,19 @@ def render_service_cards():
         with c2:
             st.link_button("Contact Us (Spotlight)", f"mailto:{CONTACT_EMAIL}", use_container_width=True)
 
+    user = st.session_state.get("auth_user") or {}
+    currency = "MYR" if user.get("country") == "Malaysia" else "INR"
+    rate = MALAYSIA_RATE if currency == "MYR" else 1.0
     for service in SERVICES:
+        original_display = round(service["original_price"] * rate, 2)
+        offer_display = round(service["offer_price"] * rate, 2)
         with st.container(border=True):
             st.markdown(f"<div class='service-title'>{service['name']}</div>", unsafe_allow_html=True)
             st.markdown(
                 (
                     f"<div class='service-price-row'>"
-                    f"<span class='service-old-price'>INR {service['original_price']}</span>"
-                    f"<span class='service-offer-price'>Offer INR {service['offer_price']}</span>"
+                    f"<span class='service-old-price'>{currency} {original_display}</span>"
+                    f"<span class='service-offer-price'>Offer {currency} {offer_display}</span>"
                     f"<span class='service-delivery'>Delivery: {service['delivery_time']}</span>"
                     f"</div>"
                 ),
@@ -837,6 +847,9 @@ def render_service_cards():
 def render_notes_store():
     st.subheader("Handwritten Notes")
     st.caption("Premium handwritten notes to help master programming concepts.")
+    user = st.session_state.get("auth_user") or {}
+    currency = "MYR" if user.get("country") == "Malaysia" else "INR"
+    rate = MALAYSIA_RATE if currency == "MYR" else 1.0
     if not st.session_state.get("notified_notes"):
         show_browser_notification(
             "CertHub Notes",
@@ -844,9 +857,10 @@ def render_notes_store():
         )
         st.session_state["notified_notes"] = True
     for note in NOTES:
+        price_display = round(note["price_inr"] * rate, 2)
         with st.container(border=True):
             st.markdown(f"<div class='note-title'>{note['title']}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='note-price'>Price: INR {note['price_inr']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='note-price'>Price: {currency} {price_display}</div>", unsafe_allow_html=True)
             st.write("Includes:")
             for topic in note["topics"]:
                 st.write(f"- {topic}")
