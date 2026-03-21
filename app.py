@@ -432,6 +432,7 @@ def render_payment_action(item_name: str, amount_inr: int, button_key: str):
                     st.warning(err or "Could not send notification email.")
         return
 
+    st.info("If you are in India or Malaysia, update your country in Profile to see the QR option.")
     st.link_button(
         f"Pay Now - INR {amount_inr}",
         build_pay_link(amount_inr, item_name),
@@ -504,6 +505,16 @@ def authenticate_user(email: str, password: str):
     if candidate_hash == stored_hash:
         return {"name": full_name, "email": user_email, "country": country or "Other"}
     return None
+
+
+def update_user_country(user_email: str, country: str):
+    conn = get_conn()
+    try:
+        conn.execute("UPDATE users SET country = ? WHERE email = ?", (country, user_email))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
 
 
 def normalize_space(text: str) -> str:
@@ -1030,6 +1041,16 @@ def main():
         st.subheader("Profile")
         st.write(f"Name: {user['name']}")
         st.write(f"Email: {user['email']}")
+        st.write("Country")
+        current_country = user.get("country", "Other")
+        country_options = ["India", "Malaysia", "Other"]
+        if current_country not in country_options:
+            current_country = "Other"
+        country = st.selectbox("Country", country_options, index=country_options.index(current_country))
+        if st.button("Save Country", use_container_width=True):
+            if update_user_country(user["email"], country):
+                st.session_state["auth_user"]["country"] = country
+                st.success("Country updated.")
         st.write("Payment Link:")
         st.code(RAZORPAY_LINK)
         st.write(CONTACT_TEXT)
