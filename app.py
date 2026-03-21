@@ -3,12 +3,15 @@ import hashlib
 import os
 import re
 import sqlite3
+import smtplib
 from collections import Counter
+from email.message import EmailMessage
 from io import BytesIO
 
 import docx
 import pdfplumber
 import streamlit as st
+from streamlit.components.v1 import html as st_html
 
 
 APP_NAME = "CertHub"
@@ -19,6 +22,7 @@ CONTACT_PHONE = "+918603234533"
 CONTACT_TEXT = f"Contact: {CONTACT_EMAIL} | {CONTACT_PHONE}"
 INDIA_QR_PATH = os.path.join("assets", "india_qr.png")
 MALAYSIA_QR_PATH = os.path.join("assets", "malaysia_qr.png")
+NOTIFY_EMAIL = "harshshandilya01@gmail.com"
 
 HEADINGS = [
     "name & contact",
@@ -319,6 +323,77 @@ def build_pay_link(amount_inr: int, item_name: str):
     # This avoids BAD_REQUEST_ERROR from invalid path patterns.
     return RAZORPAY_LINK
 
+
+def send_payment_email(item_name: str, amount_inr: int, user: dict):
+    smtp_host = st.secrets.get("SMTP_HOST", "")
+    smtp_port = int(st.secrets.get("SMTP_PORT", 0) or 0)
+    smtp_user = st.secrets.get("SMTP_USER", "")
+    smtp_password = st.secrets.get("SMTP_PASSWORD", "")
+    smtp_from = st.secrets.get("SMTP_FROM", smtp_user or CONTACT_EMAIL)
+    if not smtp_host or not smtp_port or not smtp_user or not smtp_password:
+        return False, "Email is not configured. Add SMTP settings in Streamlit secrets."
+
+    msg = EmailMessage()
+    msg["Subject"] = f"CertHub payment intent: {item_name}"
+    msg["From"] = smtp_from
+    msg["To"] = NOTIFY_EMAIL
+    msg.set_content(
+        "\n".join(
+            [
+                "A user clicked Pay Now.",
+                f"Service/Note: {item_name}",
+                f"Amount (INR): {amount_inr}",
+                f"Name: {user.get('name', 'Unknown')}",
+                f"Email: {user.get('email', 'Unknown')}",
+                f"Country: {user.get('country', 'Other')}",
+                f"Time (UTC): {datetime.datetime.utcnow().isoformat()}",
+            ]
+        )
+    )
+
+    try:
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+        return True, None
+    except Exception as exc:
+        return False, f"Email send failed: {exc}"
+
+
+def show_browser_notification(title: str, body: str):
+    st_html(
+        f"""
+        <script>
+        (function() {{
+            if (!("Notification" in window)) {{
+                return;
+            }}
+            function show() {{
+                try {{
+                    new Notification({title!r}, {{ body: {body!r} }});
+                }} catch (e) {{}}
+            }}
+            if (Notification.permission === "granted") {{
+                show();
+            }} else if (Notification.permission !== "denied") {{
+                Notification.requestPermission().then(function (permission) {{
+                    if (permission === "granted") {{
+                        show();
+                    }}
+                }});
+            }}
+        }})();
+        </script>
+        """,
+        height=0,
+    )
+
 def render_payment_action(item_name: str, amount_inr: int, button_key: str):
     user = st.session_state.get("auth_user") or {}
     payment_country = user.get("country", "Other")
@@ -329,13 +404,29 @@ def render_payment_action(item_name: str, amount_inr: int, button_key: str):
         else:
             st.image(MALAYSIA_QR_PATH, use_container_width=True, caption="Malaysia National QR")
         st.caption("After payment, share the transaction ID with support for confirmation.")
+        if st.button("I Have Paid", use_container_width=True, key=f"paid_btn_{button_key}"):
+            ok, err = send_payment_email(item_name, amount_inr, user)
+            if ok:
+                st.success("Thanks! We have notified the team.")
+            else:
+                st.warning(err or "Could not send notification email.")
         return
 
-    st.link_button(
-        f"Pay Now - INR {amount_inr}",
-        build_pay_link(amount_inr, item_name),
-        use_container_width=True,
-    )
+    if "payment_links" not in st.session_state:
+        st.session_state["payment_links"] = {}
+
+    payment_key = f"paylink_{button_key}"
+    if st.button(f"Pay Now - INR {amount_inr}", use_container_width=True, key=f"pay_btn_{button_key}"):
+        ok, err = send_payment_email(item_name, amount_inr, user)
+        if ok:
+            st.session_state["payment_links"][payment_key] = build_pay_link(amount_inr, item_name)
+            st.success("We notified the team. Continue to checkout.")
+        else:
+            st.warning(err or "Could not send notification email.")
+
+    link = st.session_state.get("payment_links", {}).get(payment_key)
+    if link:
+        st.link_button("Open Checkout", link, use_container_width=True)
 
 
 def init_db():
@@ -653,6 +744,18 @@ def recommend_services(score: float, missing_keywords: list[str], resume_text: s
 
 def render_service_cards():
     st.subheader("Services")
+    if not st.session_state.get("notified_services"):
+        show_browser_notification(
+            "CertHub Services",
+            "Limited-time offers are active. Explore premium services to boost your profile today.",
+        )
+        st.session_state["notified_services"] = True
+    if st.session_state.get("show_service_notification"):
+        service_name = st.session_state.pop("show_service_notification")
+        show_browser_notification(
+            "Service Opened",
+            f"{service_name} is ready. Add another service for faster results.",
+        )
     focus_name = st.session_state.get("selected_service")
     focus_service = next((s for s in SERVICES if s["name"] == focus_name), None)
 
@@ -706,12 +809,19 @@ def render_service_cards():
                 if st.button("Open Service", use_container_width=True, key=f"open_{service['name']}"):
                     st.session_state["selected_service"] = service["name"]
                     st.session_state["page"] = "Services"
+                    st.session_state["show_service_notification"] = service["name"]
                     st.rerun()
 
 
 def render_notes_store():
     st.subheader("Handwritten Notes")
     st.caption("Premium handwritten notes to help master programming concepts.")
+    if not st.session_state.get("notified_notes"):
+        show_browser_notification(
+            "CertHub Notes",
+            "Grab premium notes now and pair them with services for maximum impact.",
+        )
+        st.session_state["notified_notes"] = True
     for note in NOTES:
         with st.container(border=True):
             st.markdown(f"<div class='note-title'>{note['title']}</div>", unsafe_allow_html=True)
