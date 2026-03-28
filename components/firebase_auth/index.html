@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Firebase Auth</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        margin: 0;
+        background: transparent;
+      }
+      .wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 6px 0;
+      }
+      button {
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 1px solid #2ee06f;
+        background: #0d2c1f;
+        color: #e8fff2;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      #appleBtn {
+        background: #0b1a14;
+      }
+      #authError {
+        color: #ffb4b4;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <button id="googleBtn" type="button">Continue with Google</button>
+      <button id="appleBtn" type="button">Continue with Apple</button>
+      <div id="authError"></div>
+    </div>
+
+    <script>
+      let config = null;
+      let initialized = false;
+      let sent = false;
+
+      function postMessageToStreamlit(message) {
+        window.parent.postMessage(
+          Object.assign({ isStreamlitMessage: true }, message),
+          "*"
+        );
+      }
+
+      function setComponentReady() {
+        postMessageToStreamlit({
+          type: "streamlit:componentReady",
+          apiVersion: 1
+        });
+      }
+
+      function setFrameHeight(height) {
+        postMessageToStreamlit({
+          type: "streamlit:setFrameHeight",
+          height: height
+        });
+      }
+
+      function sendToStreamlit(payload) {
+        if (sent) return;
+        sent = true;
+        postMessageToStreamlit({
+          type: "streamlit:setComponentValue",
+          value: payload
+        });
+      }
+
+      function handleResult(result) {
+        if (!result || !result.user) return;
+        result.user.getIdToken().then((idToken) => {
+          sendToStreamlit({
+            idToken,
+            email: result.user.email || "",
+            name: result.user.displayName || "",
+            photoUrl: result.user.photoURL || "",
+            provider: result.providerId || "",
+            uid: result.user.uid || ""
+          });
+        });
+      }
+
+      function initFirebase() {
+        if (initialized || !config) return;
+        initialized = true;
+        if (!firebase.apps.length) {
+          firebase.initializeApp(config);
+        }
+      }
+
+      document.getElementById("googleBtn").addEventListener("click", () => {
+        const authError = document.getElementById("authError");
+        authError.textContent = "";
+        initFirebase();
+        const provider = new firebase.auth.GoogleAuthProvider();
+        firebase.auth().signInWithPopup(provider).then(handleResult).catch((err) => {
+          authError.textContent = err.message || "Google sign-in failed.";
+        });
+      });
+
+      document.getElementById("appleBtn").addEventListener("click", () => {
+        const authError = document.getElementById("authError");
+        authError.textContent = "";
+        initFirebase();
+        const provider = new firebase.auth.OAuthProvider("apple.com");
+        firebase.auth().signInWithPopup(provider).then(handleResult).catch((err) => {
+          authError.textContent = err.message || "Apple sign-in failed.";
+        });
+      });
+
+      window.addEventListener("message", (event) => {
+        const data = event.data || {};
+        if (data.type === "streamlit:render") {
+          config = (data.args && data.args.firebase_config) || null;
+          setFrameHeight(190);
+        }
+      });
+
+      setComponentReady();
+      setFrameHeight(190);
+    </script>
+  </body>
+</html>

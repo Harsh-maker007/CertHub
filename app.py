@@ -4,6 +4,7 @@ import os
 import re
 import sqlite3
 import smtplib
+import json
 from collections import Counter
 from email.message import EmailMessage
 from io import BytesIO
@@ -11,7 +12,10 @@ from io import BytesIO
 import docx
 import pdfplumber
 import streamlit as st
+import streamlit.components.v1 as components
 from streamlit.components.v1 import html as st_html
+import firebase_admin
+from firebase_admin import auth as firebase_auth, credentials
 
 
 APP_NAME = "CertHub"
@@ -487,8 +491,138 @@ def init_db():
     columns = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
     if "country" not in columns:
         conn.execute("ALTER TABLE users ADD COLUMN country TEXT NOT NULL DEFAULT 'Other'")
+    if "provider" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN provider TEXT NOT NULL DEFAULT 'local'")
+    if "provider_uid" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN provider_uid TEXT")
+    if "photo_url" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN photo_url TEXT")
+    if "country_set" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN country_set INTEGER NOT NULL DEFAULT 0")
     conn.commit()
     conn.close()
+
+
+def get_firebase_web_config():
+    required_keys = [
+        "FIREBASE_API_KEY",
+        "FIREBASE_AUTH_DOMAIN",
+        "FIREBASE_PROJECT_ID",
+        "FIREBASE_APP_ID",
+        "FIREBASE_MESSAGING_SENDER_ID",
+    ]
+    config = {}
+    missing = []
+    for key in required_keys:
+        value = st.secrets.get(key, "")
+        if not value:
+            missing.append(key)
+        else:
+            config[key] = value
+    if missing:
+        return None, missing
+    config["FIREBASE_STORAGE_BUCKET"] = st.secrets.get("FIREBASE_STORAGE_BUCKET", "")
+    config["FIREBASE_MEASUREMENT_ID"] = st.secrets.get("FIREBASE_MEASUREMENT_ID", "")
+    return config, []
+
+
+def init_firebase_admin():
+    if firebase_admin._apps:
+        return True, None
+    service_account = st.secrets.get("FIREBASE_SERVICE_ACCOUNT")
+    if not service_account:
+        return False, "Missing FIREBASE_SERVICE_ACCOUNT in Streamlit secrets."
+    if isinstance(service_account, str):
+        try:
+            service_account = json.loads(service_account)
+        except json.JSONDecodeError:
+            return False, "FIREBASE_SERVICE_ACCOUNT must be valid JSON."
+    try:
+        cred = credentials.Certificate(service_account)
+        firebase_admin.initialize_app(cred)
+        return True, None
+    except Exception as exc:
+        return False, f"Firebase admin init failed: {exc}"
+
+
+def verify_firebase_token(id_token: str):
+    ok, err = init_firebase_admin()
+    if not ok:
+        st.error(err)
+        return None
+    try:
+        return firebase_auth.verify_id_token(id_token)
+    except Exception as exc:
+        st.error(f"Token verification failed: {exc}")
+        return None
+
+
+def infer_country_from_email(email: str, locale: str | None = None):
+    if locale:
+        locale = locale.lower()
+        if locale.endswith("-in"):
+            return "India"
+        if locale.endswith("-my"):
+            return "Malaysia"
+    domain = (email.split("@")[-1] if email else "").lower()
+    if domain.endswith(".in"):
+        return "India"
+    if domain.endswith(".my"):
+        return "Malaysia"
+    return "Other"
+
+
+def upsert_oauth_user(
+    email: str,
+    full_name: str,
+    provider: str,
+    provider_uid: str,
+    photo_url: str | None,
+    country: str,
+):
+    email = (email or "").strip().lower()
+    full_name = (full_name or email.split("@")[0] if email else "User").strip()
+    country = (country or "Other").strip()
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id, full_name, email, country, country_set FROM users WHERE email = ?",
+        (email,),
+    ).fetchone()
+    if row:
+        _, existing_name, _, existing_country, country_set = row
+        final_country = existing_country if country_set else country
+        conn.execute(
+            """
+            UPDATE users
+            SET full_name = ?, country = ?, provider = ?, provider_uid = ?, photo_url = ?
+            WHERE email = ?
+            """,
+            (full_name or existing_name, final_country, provider, provider_uid, photo_url, email),
+        )
+        country_set = int(country_set or 0)
+    else:
+        conn.execute(
+            """
+            INSERT INTO users (full_name, email, password_hash, salt, created_at, country, provider, provider_uid, photo_url, country_set)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                full_name,
+                email,
+                "oauth",
+                "oauth",
+                datetime.datetime.utcnow().isoformat(),
+                country,
+                provider,
+                provider_uid,
+                photo_url,
+                0,
+            ),
+        )
+        country_set = 0
+    conn.commit()
+    conn.close()
+    return {"name": full_name, "email": email, "country": country, "country_set": country_set}
 
 
 def hash_password(password: str, salt_hex: str | None = None):
@@ -523,23 +657,31 @@ def authenticate_user(email: str, password: str):
     email = email.strip().lower()
     conn = get_conn()
     row = conn.execute(
-        "SELECT id, full_name, email, password_hash, salt, country FROM users WHERE email = ?",
+        "SELECT id, full_name, email, password_hash, salt, country, country_set FROM users WHERE email = ?",
         (email,),
     ).fetchone()
     conn.close()
     if not row:
         return None
-    _, full_name, user_email, stored_hash, salt, country = row
+    _, full_name, user_email, stored_hash, salt, country, country_set = row
     _, candidate_hash = hash_password(password, salt)
     if candidate_hash == stored_hash:
-        return {"name": full_name, "email": user_email, "country": country or "Other"}
+        return {
+            "name": full_name,
+            "email": user_email,
+            "country": country or "Other",
+            "country_set": int(country_set or 0),
+        }
     return None
 
 
 def update_user_country(user_email: str, country: str):
     conn = get_conn()
     try:
-        conn.execute("UPDATE users SET country = ? WHERE email = ?", (country, user_email))
+        conn.execute(
+            "UPDATE users SET country = ?, country_set = 1 WHERE email = ?",
+            (country, user_email),
+        )
         conn.commit()
         return True
     finally:
@@ -899,44 +1041,73 @@ def render_notes_store():
                 )
 
 
+def render_country_prompt(user):
+    st.subheader("Confirm your country")
+    st.caption("Select your country so we can show the correct QR payment option.")
+    options = ["India", "Malaysia", "Other"]
+    current = user.get("country", "Other")
+    if current not in options:
+        current = "Other"
+    country = st.selectbox("Country", options, index=options.index(current))
+    if st.button("Save Country", use_container_width=True):
+        if update_user_country(user["email"], country):
+            st.session_state["auth_user"]["country"] = country
+            st.session_state["auth_user"]["country_set"] = 1
+            st.success("Country saved.")
+            st.rerun()
+
+
+def render_firebase_login():
+    config, missing = get_firebase_web_config()
+    if missing:
+        st.warning(
+            "Firebase auth is not configured. Add these keys to Streamlit secrets: "
+            + ", ".join(missing)
+        )
+        st.info("Also add FIREBASE_SERVICE_ACCOUNT for token verification.")
+        return None
+    component = components.declare_component(
+        "firebase_auth",
+        path=os.path.join(os.path.dirname(__file__), "components", "firebase_auth"),
+    )
+    return component(
+        firebase_config={
+            "apiKey": config["FIREBASE_API_KEY"],
+            "authDomain": config["FIREBASE_AUTH_DOMAIN"],
+            "projectId": config["FIREBASE_PROJECT_ID"],
+            "appId": config["FIREBASE_APP_ID"],
+            "messagingSenderId": config["FIREBASE_MESSAGING_SENDER_ID"],
+            "storageBucket": config.get("FIREBASE_STORAGE_BUCKET", ""),
+            "measurementId": config.get("FIREBASE_MEASUREMENT_ID", ""),
+        },
+        key="firebase_auth_component",
+        default=None,
+    )
+
+
 def render_auth():
     st.title(APP_NAME)
-    st.caption("Sign in to access resume checker, services, and notes marketplace.")
+    st.caption("Sign in with Google or Apple to access resume checker, services, and notes marketplace.")
     render_hero()
-    tabs = st.tabs(["Sign In", "Create Account"])
-
-    with tabs[0]:
-        with st.form("signin_form"):
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Sign In")
-        if submit:
-            user = authenticate_user(email, password)
-            if user:
-                st.session_state["auth_user"] = user
-                st.success("Signed in successfully.")
-                st.rerun()
-            else:
-                st.error("Invalid email or password.")
-
-    with tabs[1]:
-        with st.form("signup_form"):
-            full_name = st.text_input("Full Name")
-            email = st.text_input("Email", key="signup_email")
-            password = st.text_input("Password (min 8 chars)", type="password")
-            country = st.selectbox("Country", ["India", "Malaysia", "Other"], index=2)
-            submit = st.form_submit_button("Create Account")
-        if submit:
-            if len(password) < 8:
-                st.error("Password must be at least 8 characters.")
-            elif not full_name.strip() or not email.strip():
-                st.error("Name and email are required.")
-            else:
-                ok, msg = create_user(full_name, email, password, country)
-                if ok:
-                    st.success(msg)
-                else:
-                    st.error(msg)
+    payload = render_firebase_login()
+    if not payload:
+        return
+    id_token = payload.get("idToken") if isinstance(payload, dict) else None
+    if not id_token:
+        return
+    decoded = verify_firebase_token(id_token)
+    if not decoded:
+        return
+    email = decoded.get("email") or payload.get("email") or ""
+    name = decoded.get("name") or payload.get("name") or (email.split("@")[0] if email else "User")
+    provider = payload.get("provider") or "firebase"
+    provider_uid = decoded.get("uid") or payload.get("uid") or ""
+    photo_url = decoded.get("picture") or payload.get("photoUrl") or ""
+    country = infer_country_from_email(email, decoded.get("locale"))
+    user = upsert_oauth_user(email, name, provider, provider_uid, photo_url, country)
+    st.session_state["auth_user"] = user
+    st.success("Signed in successfully.")
+    st.rerun()
 
 
 def render_resume_checker():
@@ -1050,6 +1221,9 @@ def main():
     user = st.session_state["auth_user"]
     if not user:
         render_auth()
+        return
+    if not user.get("country_set"):
+        render_country_prompt(user)
         return
 
     with st.sidebar:
