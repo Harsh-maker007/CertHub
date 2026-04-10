@@ -21,7 +21,7 @@ from firebase_admin import auth as firebase_auth, credentials
 APP_NAME = "CertHub"
 DB_PATH = "certhub_users.db"
 RAZORPAY_LINK = "https://razorpay.me/@harshshandilya"
-CONTACT_EMAIL = "itscerthub@gmail.com"
+CONTACT_EMAIL = "harshshandilya01@gmail.com"
 CONTACT_PHONE = "+918603234533"
 CONTACT_TEXT = f"Contact: {CONTACT_EMAIL} | {CONTACT_PHONE}"
 INDIA_QR_PATH = os.path.join("assets", "india_qr.png")
@@ -173,7 +173,7 @@ SERVICES = [
         "delivery_time": "5-7 days",
     },
     {
-        "name": "Report Making",
+        "name": "Report Making (For Plagiarism score less than 10 Contact Us !)",
         "description": "Technical reports for internships, projects, and case studies.",
         "best_for": "Academic and project submissions requiring formal documentation.",
         "original_price": 299,
@@ -193,7 +193,7 @@ NOTES = [
     {"title": "MongoDB", "price_inr": 99, "topics": ["MongoDB Fundamentals", "Database Design", "CRUD Operations", "Aggregation Framework", "Indexing & Performance"]},
     {"title": "Machine Learning", "price_inr": 369, "topics": ["ML Fundamentals", "Supervised Learning", "Unsupervised Learning", "Neural Networks", "Model Optimization"]},
 ]
-MALAYSIA_RATE = 0.057  # Rough INR -> MYR display conversion
+MALAYSIA_RATE = 0.050  # Rough INR -> MYR display conversion
 
 
 def inject_theme():
