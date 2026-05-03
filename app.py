@@ -1,5 +1,7 @@
+import csv
 import datetime
 import hashlib
+import io
 import os
 import re
 import sqlite3
@@ -14,6 +16,7 @@ import streamlit as st
 
 
 APP_NAME = "CertHub"
+ADMIN_EMAIL = "harshshandilya01@gmail.com"
 DB_PATH = "certhub_users.db"
 RAZORPAY_LINK = "https://razorpay.me/@harshshandilya"
 RAZORPAY_KEY_ID = "rzp_live_RJNwYg2Jx647o8"
@@ -112,88 +115,17 @@ ACTION_VERBS = {
 }
 
 SERVICES = [
-    {
-        "name": "Certificate Assistance",
-        "description": "Help obtaining certificates from HackerRank, Infosys Springboard, Google, Udemy and platform guidance.",
-        "best_for": "Students needing verified certifications quickly.",
-        "original_price": 599,
-        "offer_price": 299,
-        "delivery_time": "Up to 12 hrs",
-    },
-    {
-        "name": "Portfolio Making",
-        "description": "Custom portfolio website, mobile responsive, SEO optimized, professional layout, domain and hosting setup.",
-        "best_for": "Missing project visibility and personal branding.",
-        "original_price": 999,
-        "offer_price": 199,
-        "delivery_time": "24 hrs",
-    },
-    {
-        "name": "LinkedIn Manager",
-        "description": "Profile optimization, content strategy, network building, personal branding, post scheduling.",
-        "best_for": "Better discoverability and personal brand.",
-        "original_price": 399,
-        "offer_price": 199,
-        "delivery_time": "6 hrs",
-    },
-    {
-        "name": "Presentation Making",
-        "description": "Custom slides, data visualization, brand consistency, interactive elements, templates.",
-        "best_for": "Interview rounds requiring project walkthroughs.",
-        "original_price": 200,
-        "offer_price": 100,
-        "delivery_time": "30 min",
-    },
-    {
-        "name": "Resume Making",
-        "description": "ATS optimized resume, professional formatting, keyword optimization, cover letter included.",
-        "best_for": "Low ATS score, weak structure, missing role keywords.",
-        "original_price": 500,
-        "offer_price": 200,
-        "delivery_time": "6 hours",
-    },
-    {
-        "name": "UI/UX Designer",
-        "description": "User research, wireframes, prototyping, responsive design, usability testing.",
-        "best_for": "Website/app projects needing stronger usability and visual quality.",
-        "original_price": 599,
-        "offer_price": 299,
-        "delivery_time": "24 hrs",
-    },
-    {
-        "name": "Basic Website Project",
-        "description": "Custom design, mobile responsive, up to 5 pages, contact form, basic SEO.",
-        "best_for": "Beginners building first portfolio-ready projects.",
-        "original_price": 699,
-        "offer_price": 369,
-        "delivery_time": "48 hrs",
-    },
-    {
-        "name": "Full Functional Website",
-        "description": "Custom UI/UX, backend integration, database setup, hosting deployment.",
-        "best_for": "Intermediate profile with deployment-ready project requirement.",
-        "original_price": 2999,
-        "offer_price": 999,
-        "delivery_time": "1-2 days",
-    },
-    {
-        "name": "Advanced Project (ML/AI)",
-        "description": "ML model development, data preprocessing, training/testing, deployment ready.",
-        "best_for": "Students targeting data or AI roles.",
-        "original_price": 5499,
-        "offer_price": 2999,
-        "delivery_time": "5-7 days",
-    },
-    {
-        "name": "Report Making",
-        "description": "Technical reports for internships, projects, and case studies.",
-        "best_for": "Academic and project submissions requiring formal documentation.",
-        "original_price": 299,
-        "offer_price": 149,
-        "delivery_time": "6 hrs",
-    },
+    {"name": "Certificate Assistance", "description": "Help obtaining certificates from HackerRank, Infosys Springboard, Google, Udemy and platform guidance.", "best_for": "Students needing verified certifications quickly.", "original_price": 599, "offer_price": 299, "delivery_time": "Up to 12 hrs", "category": "Career"},
+    {"name": "Portfolio Making", "description": "Custom portfolio website, mobile responsive, SEO optimized, professional layout, domain and hosting setup.", "best_for": "Missing project visibility and personal branding.", "original_price": 999, "offer_price": 199, "delivery_time": "24 hrs", "category": "Web"},
+    {"name": "LinkedIn Manager", "description": "Profile optimization, content strategy, network building, personal branding, post scheduling.", "best_for": "Better discoverability and personal brand.", "original_price": 399, "offer_price": 199, "delivery_time": "6 hrs", "category": "Career"},
+    {"name": "Presentation Making", "description": "Custom slides, data visualization, brand consistency, interactive elements, templates.", "best_for": "Interview rounds requiring project walkthroughs.", "original_price": 200, "offer_price": 100, "delivery_time": "30 min", "category": "Career"},
+    {"name": "Resume Making", "description": "ATS optimized resume, professional formatting, keyword optimization, cover letter included.", "best_for": "Low ATS score, weak structure, missing role keywords.", "original_price": 500, "offer_price": 200, "delivery_time": "6 hours", "category": "Career"},
+    {"name": "UI/UX Designer", "description": "User research, wireframes, prototyping, responsive design, usability testing.", "best_for": "Website/app projects needing stronger usability and visual quality.", "original_price": 599, "offer_price": 299, "delivery_time": "24 hrs", "category": "Web"},
+    {"name": "Basic Website Project", "description": "Custom design, mobile responsive, up to 5 pages, contact form, basic SEO.", "best_for": "Beginners building first portfolio-ready projects.", "original_price": 699, "offer_price": 369, "delivery_time": "48 hrs", "category": "Web"},
+    {"name": "Full Functional Website", "description": "Custom UI/UX, backend integration, database setup, hosting deployment.", "best_for": "Intermediate profile with deployment-ready project requirement.", "original_price": 2999, "offer_price": 999, "delivery_time": "1-2 days", "category": "Web"},
+    {"name": "Advanced Project (ML/AI)", "description": "ML model development, data preprocessing, training/testing, deployment ready.", "best_for": "Students targeting data or AI roles.", "original_price": 5499, "offer_price": 2999, "delivery_time": "5-7 days", "category": "AI"},
+    {"name": "Report Making", "description": "Technical reports for internships, projects, and case studies.", "best_for": "Academic and project submissions requiring formal documentation.", "original_price": 299, "offer_price": 149, "delivery_time": "6 hrs", "category": "Career"},
 ]
-
 NOTES = [
     {"title": "Python Notes (Up to Advanced)", "price_inr": 199, "topics": ["Python Fundamentals", "Data Structures", "OOP Concepts", "Advanced Python", "Libraries & Frameworks"]},
     {"title": "Java with DSA", "price_inr": 299, "topics": ["Java Fundamentals", "Data Structures", "Algorithms", "Problem Solving", "Interview Preparation"]},
@@ -211,98 +143,70 @@ def inject_theme():
     st.markdown(
         """
         <style>
-            .stApp {
-                background: radial-gradient(circle at 20% 10%, #0f3d2b 0%, #071f17 40%, #03110d 100%);
-            }
-            .certhub-hero {
-                border: 1px solid rgba(46, 204, 113, 0.25);
-                border-radius: 20px;
-                padding: 28px 24px;
-                margin-bottom: 16px;
-                background: linear-gradient(135deg, rgba(8,41,30,0.95), rgba(5,23,17,0.95));
-            }
-            .certhub-title {
-                font-size: 2.2rem;
-                line-height: 1.15;
-                font-weight: 800;
-                color: #2ee06f;
-                margin: 0;
-            }
-            .certhub-subtitle {
-                color: #b6c4bc;
-                margin-top: 10px;
-                font-size: 1.05rem;
-            }
-            .recommend-card {
-                border: 2px solid #2ee06f;
-                border-radius: 16px;
-                padding: 18px;
-                margin: 8px 0 16px 0;
-                background: rgba(10, 44, 31, 0.95);
-                box-shadow: 0 0 0 1px rgba(46, 224, 111, 0.2), 0 8px 24px rgba(0, 0, 0, 0.35);
-            }
-            .service-spotlight {
-                border: 2px solid #2ee06f;
-                border-radius: 18px;
-                padding: 20px;
-                margin-bottom: 18px;
-                background: linear-gradient(135deg, rgba(18, 66, 46, 0.95), rgba(8, 33, 24, 0.95));
-                box-shadow: 0 0 0 1px rgba(46, 224, 111, 0.25), 0 12px 28px rgba(0, 0, 0, 0.35);
-            }
-            .recommend-label {
-                color: #9ff0bf;
-                font-weight: 700;
-                letter-spacing: 0.2px;
-                font-size: 0.92rem;
-                text-transform: uppercase;
-            }
-            .recommend-main {
-                color: #ffffff;
-                font-size: 1.5rem;
-                font-weight: 900;
-                margin: 6px 0;
-            }
-            .recommend-reason {
-                color: #d2ddd7;
-                font-size: 1rem;
-            }
-            .note-title {
-                font-size: 1.3rem;
-                font-weight: 900;
-                color: #58f7a0;
-                margin-bottom: 4px;
-                letter-spacing: 0.1px;
-            }
-            .note-price {
-                color: #e9fff3;
-                font-weight: 700;
-            }
-            .service-title {
-                font-size: 1.25rem;
-                font-weight: 900;
-                color: #58f7a0;
-                margin-bottom: 4px;
-                letter-spacing: 0.1px;
-            }
-            .service-price-row {
-                margin: 2px 0 8px 0;
-                color: #d9ffe9;
-                font-size: 0.96rem;
-            }
-            .service-old-price {
-                text-decoration: line-through;
-                opacity: 0.75;
-                margin-right: 10px;
-            }
-            .service-offer-price {
-                color: #7dffb2;
-                font-weight: 900;
-                margin-right: 12px;
-            }
-            .service-delivery {
-                color: #bde7cc;
-                font-weight: 700;
-            }
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+            html,body,[class*="css"]{font-family:'Inter',sans-serif!important}
+            .stApp{background:linear-gradient(135deg,#020810 0%,#060f1e 50%,#020810 100%);min-height:100vh}
+            @keyframes pulse-glow{0%,100%{box-shadow:0 0 20px rgba(108,99,255,.15)}50%{box-shadow:0 0 40px rgba(108,99,255,.35)}}
+            @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+            @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+            @keyframes fade-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+            section[data-testid="stSidebar"]{background:linear-gradient(180deg,#030b18 0%,#071224 100%)!important;border-right:1px solid rgba(108,99,255,.2)!important}
+            .stButton>button{border-radius:12px!important;font-weight:700!important;transition:all .25s ease!important;letter-spacing:.3px!important}
+            .stButton>button:hover{transform:translateY(-3px)!important;box-shadow:0 8px 24px rgba(108,99,255,.4)!important}
+            .hero-section{background:linear-gradient(135deg,rgba(108,99,255,.14) 0%,rgba(0,212,255,.08) 100%);border:1px solid rgba(108,99,255,.3);border-radius:24px;padding:48px 36px;margin-bottom:28px;position:relative;overflow:hidden;animation:fade-in .6s ease}
+            .hero-section::before{content:'';position:absolute;top:-60px;right:-60px;width:260px;height:260px;background:radial-gradient(circle,rgba(108,99,255,.18) 0%,transparent 70%);pointer-events:none}
+            .hero-title{font-size:3rem;font-weight:900;background:linear-gradient(135deg,#a78bfa,#6C63FF,#00D4FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1;margin:0 0 14px 0}
+            .hero-sub{color:#94a3b8;font-size:1.1rem;margin:0 0 22px 0;line-height:1.7}
+            .feature-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+            .feature-chip{background:rgba(108,99,255,.13);border:1px solid rgba(108,99,255,.3);border-radius:30px;padding:7px 18px;color:#c4b5fd;font-size:.83rem;font-weight:600}
+            .trust-bar{display:flex;gap:28px;flex-wrap:wrap;align-items:center;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:14px 24px;margin:16px 0 20px 0}
+            .trust-item{display:flex;align-items:center;gap:8px;color:#94a3b8;font-size:.85rem;font-weight:500}
+            .trust-item b{color:#e2e8f0}
+            .urgency-bar{background:linear-gradient(90deg,rgba(239,68,68,.12),rgba(245,158,11,.12));border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:10px 20px;text-align:center;color:#fca5a5;font-size:.88rem;font-weight:600;margin-bottom:18px;animation:pulse-glow 2s infinite}
+            .step-card{background:rgba(108,99,255,.06);border:1px solid rgba(108,99,255,.18);border-radius:16px;padding:24px 20px;text-align:center;transition:all .25s}
+            .step-card:hover{transform:translateY(-4px);box-shadow:0 14px 40px rgba(108,99,255,.2);border-color:rgba(108,99,255,.35)}
+            .step-num{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#6C63FF,#00D4FF);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.1rem;color:#fff;margin:0 auto 14px auto}
+            .step-title{font-size:1rem;font-weight:700;color:#f1f5f9;margin-bottom:6px}
+            .step-desc{color:#64748b;font-size:.85rem;line-height:1.6}
+            .testimonial-card{background:rgba(255,255,255,.04);border:1px solid rgba(108,99,255,.15);border-radius:16px;padding:22px 22px 16px 22px;margin-bottom:10px}
+            .testimonial-text{color:#cbd5e1;font-size:.9rem;line-height:1.7;margin-bottom:12px}
+            .testimonial-author{font-weight:700;color:#a78bfa;font-size:.82rem}
+            .testimonial-role{color:#475569;font-size:.78rem}
+            .stars{color:#f59e0b;letter-spacing:2px;margin-bottom:8px;font-size:.9rem}
+            .premium-card{background:rgba(255,255,255,.04);backdrop-filter:blur(14px);border:1px solid rgba(108,99,255,.18);border-radius:18px;padding:26px;margin-bottom:14px;transition:transform .25s,box-shadow .25s}
+            .premium-card:hover{transform:translateY(-4px);box-shadow:0 16px 48px rgba(108,99,255,.2)}
+            .stat-card{background:rgba(255,255,255,.04);border:1px solid rgba(108,99,255,.18);border-radius:16px;padding:24px;text-align:center;transition:all .25s}
+            .stat-card:hover{border-color:rgba(108,99,255,.4);transform:translateY(-4px)}
+            .stat-number{font-size:2.6rem;font-weight:900;background:linear-gradient(135deg,#6C63FF,#00D4FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+            .stat-label{font-size:.8rem;color:#64748b;margin-top:6px;letter-spacing:.8px;text-transform:uppercase}
+            .score-ring-wrap{display:flex;justify-content:center;align-items:center;margin:20px 0}
+            .insight-success{background:rgba(16,185,129,.08);border-left:3px solid #10b981;border-radius:10px;padding:12px 16px;margin:6px 0;color:#d1fae5;font-size:.88rem}
+            .insight-warn{background:rgba(245,158,11,.08);border-left:3px solid #f59e0b;border-radius:10px;padding:12px 16px;margin:6px 0;color:#fef3c7;font-size:.88rem}
+            .insight-danger{background:rgba(239,68,68,.08);border-left:3px solid #ef4444;border-radius:10px;padding:12px 16px;margin:6px 0;color:#fee2e2;font-size:.88rem}
+            .insight-info{background:rgba(108,99,255,.08);border-left:3px solid #6C63FF;border-radius:10px;padding:12px 16px;margin:6px 0;color:#e0e7ff;font-size:.88rem}
+            .service-card{background:rgba(255,255,255,.04);border:1px solid rgba(108,99,255,.15);border-top:3px solid #6C63FF;border-radius:18px;padding:22px;margin-bottom:12px;transition:all .25s}
+            .service-card:hover{border-color:rgba(108,99,255,.45);transform:translateY(-3px);box-shadow:0 10px 32px rgba(108,99,255,.18)}
+            .service-name{font-size:1.05rem;font-weight:700;color:#f1f5f9;margin-bottom:6px}
+            .offer-price{font-size:1.3rem;font-weight:900;color:#818cf8}
+            .orig-price{font-size:.85rem;color:#475569;text-decoration:line-through;margin-right:8px}
+            .delivery-badge{display:inline-block;background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.25);border-radius:20px;padding:3px 11px;font-size:.73rem;font-weight:600;margin-left:8px}
+            .best-for-pill{display:inline-block;background:rgba(108,99,255,.1);color:#a78bfa;border:1px solid rgba(108,99,255,.2);border-radius:20px;padding:3px 11px;font-size:.73rem;margin-top:8px}
+            .hot-badge{display:inline-block;background:linear-gradient(90deg,#ef4444,#f97316);color:#fff;border-radius:20px;padding:2px 10px;font-size:.7rem;font-weight:700;margin-left:6px;letter-spacing:.5px}
+            .note-card{background:rgba(255,255,255,.04);border:1px solid rgba(0,212,255,.15);border-top:3px solid #00D4FF;border-radius:18px;padding:22px;margin-bottom:12px;transition:all .25s}
+            .note-card:hover{transform:translateY(-3px);box-shadow:0 10px 32px rgba(0,212,255,.14)}
+            .note-name{font-size:1.05rem;font-weight:700;color:#f1f5f9;margin-bottom:6px}
+            .note-price{font-size:1.2rem;font-weight:900;color:#22d3ee}
+            .topic-pill{display:inline-block;background:rgba(0,212,255,.08);color:#67e8f9;border:1px solid rgba(0,212,255,.18);border-radius:20px;padding:2px 9px;font-size:.72rem;margin:2px 2px 4px 0}
+            .page-title{font-size:1.8rem;font-weight:900;background:linear-gradient(135deg,#6C63FF,#00D4FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+            .page-sub{color:#475569;font-size:.92rem;margin-bottom:22px}
+            .admin-badge{display:inline-block;background:linear-gradient(135deg,#6C63FF,#00D4FF);color:#fff;border-radius:20px;padding:3px 14px;font-size:.72rem;font-weight:700;letter-spacing:.5px}
+            .admin-stat{background:rgba(108,99,255,.07);border:1px solid rgba(108,99,255,.18);border-radius:14px;padding:20px;text-align:center}
+            .reco-card{border:2px solid rgba(108,99,255,.5);border-radius:18px;padding:20px;margin:8px 0 16px 0;background:linear-gradient(135deg,rgba(108,99,255,.1),rgba(0,212,255,.05));box-shadow:0 0 0 1px rgba(108,99,255,.15),0 10px 30px rgba(0,0,0,.35);animation:pulse-glow 3s infinite}
+            .reco-label{color:#a78bfa;font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.8px}
+            .reco-main{color:#f1f5f9;font-size:1.4rem;font-weight:900;margin:6px 0}
+            .reco-reason{color:#94a3b8;font-size:.92rem}
+            .auth-card{background:rgba(255,255,255,.03);border:1px solid rgba(108,99,255,.2);border-radius:18px;padding:30px 24px}
+            .footer-bar{background:rgba(108,99,255,.06);border:1px solid rgba(108,99,255,.12);border-radius:14px;padding:16px 24px;text-align:center;margin-top:28px;color:#475569;font-size:.85rem}
         </style>
         """,
         unsafe_allow_html=True,
@@ -312,17 +216,54 @@ def inject_theme():
 def render_hero():
     st.markdown(
         """
-        <div class="certhub-hero">
-            <p class="certhub-title">Certification Excellence Hub</p>
-            <p class="certhub-subtitle">
-                Resume review, project services, and premium handwritten notes in one place.
-                Upload resume and get instant ATS guidance with clear service recommendations.
-            </p>
+        <div class="urgency-bar">🔥 Limited Offer — Save up to 66% on all services this week only!</div>
+        <div class="hero-section">
+            <p class="hero-title">🚀 CertHub — Your Career Launchpad</p>
+            <p class="hero-sub">India's #1 platform for ATS-optimized resumes, expert career services &amp; premium study notes.<br>Join <b>2,000+</b> students who landed their dream jobs with CertHub.</p>
+            <div class="trust-bar">
+                <div class="trust-item">✅ <b>2,000+</b> Students Served</div>
+                <div class="trust-item">⚡ <b>30-min</b> Fastest Delivery</div>
+                <div class="trust-item">🏆 <b>4.9★</b> Avg Rating</div>
+                <div class="trust-item">💯 <b>100%</b> Satisfaction Guarantee</div>
+                <div class="trust-item">🔒 Secure Payments</div>
+            </div>
+            <div class="feature-row">
+                <span class="feature-chip">📄 ATS Resume Scorer</span>
+                <span class="feature-chip">🛍️ 10+ Expert Services</span>
+                <span class="feature-chip">📚 Premium Study Notes</span>
+                <span class="feature-chip">⚡ Fast Delivery</span>
+                <span class="feature-chip">🎯 Job-Specific Advice</span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+
+def render_how_it_works():
+    st.markdown('<p class="page-title">⚡ How It Works</p><p class="page-sub">Get your career on track in 3 simple steps</p>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    steps = [
+        ("1", "Upload or Analyze", "Upload your resume or browse our services. Our AI scores your resume instantly."),
+        ("2", "Get Expert Help", "Choose a service. Our experts deliver high-quality work within your timeline."),
+        ("3", "Land Your Dream Job", "Apply with a stronger profile, pass ATS filters, and ace your interviews."),
+    ]
+    for col, (num, title, desc) in zip([c1, c2, c3], steps):
+        with col:
+            st.markdown(f'<div class="step-card"><div class="step-num">{num}</div><div class="step-title">{title}</div><div class="step-desc">{desc}</div></div>', unsafe_allow_html=True)
+
+
+def render_testimonials():
+    st.markdown('<p class="page-title" style="margin-top:8px">💬 What Students Say</p>', unsafe_allow_html=True)
+    testimonials = [
+        ("Got placed at Infosys within 2 weeks of using CertHub's resume service. My ATS score jumped from 34% to 87%!", "Priya S.", "Software Engineer @ Infosys", "★★★★★"),
+        ("The LinkedIn Manager service got me 3x more profile views in a week. Highly recommend!", "Rahul M.", "Data Analyst @ TCS", "★★★★★"),
+        ("Best investment for my career. Got my Python notes + resume done together. Super affordable!", "Aisha K.", "ML Engineer @ Wipro", "★★★★★"),
+    ]
+    cols = st.columns(3)
+    for col, (text, author, role, stars) in zip(cols, testimonials):
+        with col:
+            st.markdown(f'<div class="testimonial-card"><div class="stars">{stars}</div><div class="testimonial-text">"{text}"</div><div class="testimonial-author">{author}</div><div class="testimonial-role">{role}</div></div>', unsafe_allow_html=True)
 
 def render_primary_recommendation(recommended):
     if not recommended:
@@ -332,11 +273,11 @@ def render_primary_recommendation(recommended):
     top_offer_price = top_service["offer_price"] if top_service else None
     st.markdown(
         f"""
-        <div class="recommend-card">
-            <div class="recommend-label">Recommended Service For You</div>
-            <div class="recommend-main">{top_name}</div>
-            <div class="recommend-reason">{top_reason}</div>
-            <div class="recommend-reason"><b>Offer Price:</b> INR {top_offer_price if top_offer_price else 'NA'}</div>
+        <div class="reco-card">
+            <div class="reco-label">⭐ Recommended For You</div>
+            <div class="reco-main">{top_name}</div>
+            <div class="reco-reason">{top_reason}</div>
+            <div class="reco-reason" style="margin-top:8px"><span style="color:#6C63FF;font-weight:700">Offer Price: INR {top_offer_price if top_offer_price else 'NA'}</span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -348,7 +289,7 @@ def render_primary_recommendation(recommended):
         else:
             st.link_button("Pay Now", RAZORPAY_LINK, use_container_width=True)
     with c2:
-        if st.button("Open This Service", use_container_width=True, key=f"open_reco_{top_name}"):
+        if st.button("🔍 Open This Service", use_container_width=True, key=f"open_reco_{top_name}"):
             st.session_state["selected_service"] = top_name
             st.session_state["page"] = "Services"
             st.rerun()
@@ -503,6 +444,77 @@ def authenticate_user(email: str, password: str):
     if candidate_hash == stored_hash:
         return {"name": full_name, "email": user_email, "country": country or "Other"}
     return None
+
+
+def get_all_users():
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, full_name, email, country, created_at FROM users ORDER BY created_at DESC"
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def get_user_count():
+    conn = get_conn()
+    count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    conn.close()
+    return count
+
+
+def delete_user(email: str):
+    conn = get_conn()
+    conn.execute("DELETE FROM users WHERE email = ?", (email.strip().lower(),))
+    conn.commit()
+    conn.close()
+
+
+def update_user(email: str, new_name: str, new_country: str):
+    conn = get_conn()
+    conn.execute(
+        "UPDATE users SET full_name = ?, country = ? WHERE email = ?",
+        (new_name.strip(), new_country.strip(), email.strip().lower()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def reset_password_db(email: str, full_name: str, new_password: str):
+    """Reset password after verifying email + full_name match."""
+    email = email.strip().lower()
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT full_name FROM users WHERE email = ?", (email,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return False, "No account found with that email."
+    if row[0].strip().lower() != full_name.strip().lower():
+        return False, "Full name does not match our records."
+    salt, pw_hash = hash_password(new_password)
+    conn = get_conn()
+    conn.execute(
+        "UPDATE users SET password_hash = ?, salt = ? WHERE email = ?",
+        (pw_hash, salt, email),
+    )
+    conn.commit()
+    conn.close()
+    return True, "Password reset successfully. Please sign in."
+
+
+def change_password(email: str, old_password: str, new_password: str):
+    user = authenticate_user(email, old_password)
+    if not user:
+        return False, "Current password is incorrect."
+    salt, pw_hash = hash_password(new_password)
+    conn = get_conn()
+    conn.execute(
+        "UPDATE users SET password_hash = ?, salt = ? WHERE email = ?",
+        (pw_hash, salt, email.strip().lower()),
+    )
+    conn.commit()
+    conn.close()
+    return True, "Password changed successfully."
 
 
 def normalize_space(text: str) -> str:
@@ -1119,81 +1131,72 @@ def recommend_services(score: float, missing_keywords: list[str], resume_text: s
 
 
 def render_service_cards():
-    st.subheader("Services")
+    st.markdown('<p class="page-title">🛍️ Services</p><p class="page-sub">Expert services to accelerate your career growth</p>', unsafe_allow_html=True)
+    cats = ["All"] + sorted(set(s.get("category","Other") for s in SERVICES))
+    sel_cat = st.radio("Filter", cats, horizontal=True, label_visibility="collapsed")
+    filtered = SERVICES if sel_cat == "All" else [s for s in SERVICES if s.get("category") == sel_cat]
     focus_name = st.session_state.get("selected_service")
     focus_service = next((s for s in SERVICES if s["name"] == focus_name), None)
-
     if focus_service:
-        st.markdown(
-            f"""
-            <div class="service-spotlight">
-                <div class="recommend-label">Service Spotlight</div>
-                <div class="recommend-main">{focus_service['name']}</div>
-                <div class="recommend-reason">{focus_service['description']}</div>
-                <div class="recommend-reason"><b>Best for:</b> {focus_service['best_for']}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        c1, c2 = st.columns([1, 1])
+        st.markdown(f"""
+        <div class="reco-card">
+            <div class="reco-label">✨ Service Spotlight</div>
+            <div class="reco-main">{focus_service['name']}</div>
+            <div class="reco-reason">{focus_service['description']}</div>
+            <div class="reco-reason"><b>Best for:</b> {focus_service['best_for']}</div>
+        </div>""", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
         with c1:
             render_payment_action(focus_service["name"], focus_service["offer_price"], f"spotlight_{focus_service['name']}")
         with c2:
-            st.link_button("Contact Us (Spotlight)", f"mailto:{CONTACT_EMAIL}", use_container_width=True)
-
-    for service in SERVICES:
-        with st.container(border=True):
-            st.markdown(f"<div class='service-title'>{service['name']}</div>", unsafe_allow_html=True)
-            st.markdown(
-                (
-                    f"<div class='service-price-row'>"
-                    f"<span class='service-old-price'>INR {service['original_price']}</span>"
-                    f"<span class='service-offer-price'>Offer INR {service['offer_price']}</span>"
-                    f"<span class='service-delivery'>Delivery: {service['delivery_time']}</span>"
-                    f"</div>"
-                ),
-                unsafe_allow_html=True,
-            )
-            st.write(service["description"])
-            st.caption(f"Best for: {service['best_for']}")
-            c1, c2, c3 = st.columns([1, 1, 1])
+            st.link_button("📧 Contact Us", f"mailto:{CONTACT_EMAIL}?subject=Inquiry%20for%20{focus_service['name'].replace(' ','%20')}", use_container_width=True)
+        st.markdown("---")
+    cols = st.columns(3)
+    for i, service in enumerate(filtered):
+        with cols[i % 3]:
+            st.markdown(f"""
+            <div class="service-card">
+                <div class="service-name">{service['name']}</div>
+                <div style="margin:4px 0 8px 0">
+                    <span class="orig-price">₹{service['original_price']}</span>
+                    <span class="offer-price">₹{service['offer_price']}</span>
+                    <span class="delivery-badge">⚡ {service['delivery_time']}</span>
+                </div>
+                <div style="color:#94a3b8;font-size:.88rem;margin-bottom:8px">{service['description']}</div>
+                <div class="best-for-pill">🎯 {service['best_for']}</div>
+            </div>""", unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
             with c1:
-                render_payment_action(service["name"], service["offer_price"], f"service_{service['name']}")
+                render_payment_action(service["name"], service["offer_price"], f"svc_{service['name']}")
             with c2:
-                st.link_button(
-                    f"Contact Us - {service['name']}",
-                    f"mailto:{CONTACT_EMAIL}?subject=Inquiry%20for%20{service['name'].replace(' ', '%20')}",
-                    use_container_width=True,
-                )
-            with c3:
-                if st.button("Open Service", use_container_width=True, key=f"open_{service['name']}"):
-                    st.session_state["selected_service"] = service["name"]
-                    st.session_state["page"] = "Services"
-                    st.rerun()
+                st.link_button("Contact", f"mailto:{CONTACT_EMAIL}?subject={service['name'].replace(' ','%20')}", use_container_width=True)
+
+    focus_name = st.session_state.get("selected_service")
+    focus_service = next((s for s in SERVICES if s["name"] == focus_name), None)
+
 
 
 def render_notes_store():
-    st.subheader("Handwritten Notes")
-    st.caption("Premium handwritten notes to help master programming concepts.")
-    for note in NOTES:
-        with st.container(border=True):
-            st.markdown(f"<div class='note-title'>{note['title']}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='note-price'>Price: INR {note['price_inr']}</div>", unsafe_allow_html=True)
-            st.write("Includes:")
-            for topic in note["topics"]:
-                st.write(f"- {topic}")
-            c1, c2 = st.columns([1, 1])
+    st.markdown('<p class="page-title">📚 Study Notes</p><p class="page-sub">Premium handwritten notes to master programming concepts</p>', unsafe_allow_html=True)
+    cols = st.columns(3)
+    for i, note in enumerate(NOTES):
+        with cols[i % 3]:
+            topics_html = "".join(f'<span class="topic-pill">{t}</span>' for t in note["topics"])
+            st.markdown(f"""
+            <div class="note-card">
+                <div class="note-name">{note['title']}</div>
+                <div class="note-price">₹{note['price_inr']}</div>
+                <div style="margin-top:10px">{topics_html}</div>
+            </div>""", unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
             with c1:
                 render_payment_action(note["title"], note["price_inr"], f"note_{note['title']}")
             with c2:
-                st.link_button(
-                    f"Contact Us - {note['title']}",
-                    f"mailto:{CONTACT_EMAIL}?subject=Inquiry%20for%20{note['title'].replace(' ', '%20')}",
-                    use_container_width=True,
-                )
+                st.link_button("Contact", f"mailto:{CONTACT_EMAIL}?subject={note['title'].replace(' ','%20')}", use_container_width=True)
 
 
 def render_auth():
+
     st.markdown("""
     <style>
         .auth-container {
@@ -1223,36 +1226,28 @@ def render_auth():
     st.caption("Build: country-select enabled")
     
     render_hero()
-    
-    col_left, col_right = st.columns([1, 1])
-    
-    with col_left:
-        st.markdown("### 🔐 Sign In")
+    st.markdown('<p style="text-align:center;color:#64748b;font-size:.85rem;margin-top:-10px">Forgot password? Use the tab below ↓</p>', unsafe_allow_html=True)
+    tab1, tab2, tab3 = st.tabs(["🔐 Sign In", "✨ Create Account", "🔑 Reset Password"])
+    with tab1:
         with st.form("signin_form"):
-            email = st.text_input("📧 Email", placeholder="your@email.com", label_visibility="collapsed")
-            password = st.text_input("🔒 Password", type="password", placeholder="Enter your password", label_visibility="collapsed")
-            st.markdown("")
-            submit = st.form_submit_button("➜ Sign In", use_container_width=True, type="primary")
-        
+            email = st.text_input("Email", placeholder="your@email.com")
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
+            submit = st.form_submit_button("Sign In →", use_container_width=True, type="primary")
         if submit:
             user = authenticate_user(email, password)
             if user:
                 st.session_state["auth_user"] = user
-                st.success("✅ Signed in successfully!")
+                st.success("✅ Signed in!")
                 st.rerun()
             else:
                 st.error("❌ Invalid email or password.")
-    
-    with col_right:
-        st.markdown("### ✨ Create Account")
+    with tab2:
         with st.form("signup_form"):
-            full_name = st.text_input("👤 Full Name", placeholder="Your full name", label_visibility="collapsed")
-            email = st.text_input("📧 Email", key="signup_email", placeholder="your@email.com", label_visibility="collapsed")
-            password = st.text_input("🔒 Password", type="password", placeholder="Min 8 characters", label_visibility="collapsed")
+            full_name = st.text_input("Full Name", placeholder="Your full name")
+            email = st.text_input("Email", key="signup_email", placeholder="your@email.com")
+            password = st.text_input("Password", type="password", placeholder="Min 8 characters")
             country = st.selectbox("Country", ["India", "Malaysia", "Other"], index=2)
-            st.markdown("")
-            submit = st.form_submit_button("➜ Create Account", use_container_width=True, type="primary")
-        
+            submit = st.form_submit_button("Create Account →", use_container_width=True, type="primary")
         if submit:
             if len(password) < 8:
                 st.error("❌ Password must be at least 8 characters.")
@@ -1260,235 +1255,324 @@ def render_auth():
                 st.error("❌ Name and email are required.")
             else:
                 ok, msg = create_user(full_name, email, password, country)
-                if ok:
-                    st.success(f"✅ {msg}")
-                else:
-                    st.error(f"❌ {msg}")
+                st.success(f"✅ {msg}") if ok else st.error(f"❌ {msg}")
+    with tab3:
+        st.caption("Verify your identity with your registered name to reset password.")
+        with st.form("reset_form"):
+            r_email = st.text_input("Registered Email", placeholder="your@email.com")
+            r_name = st.text_input("Full Name (as registered)", placeholder="Your full name")
+            r_new = st.text_input("New Password", type="password", placeholder="Min 8 characters")
+            r_submit = st.form_submit_button("Reset Password →", use_container_width=True, type="primary")
+        if r_submit:
+            if len(r_new) < 8:
+                st.error("❌ New password must be at least 8 characters.")
+            else:
+                ok, msg = reset_password_db(r_email, r_name, r_new)
+                st.success(f"✅ {msg}") if ok else st.error(f"❌ {msg}")
+
+
+def _score_color(score):
+    if score >= 75: return "#10b981", "#d1fae5"
+    if score >= 50: return "#f59e0b", "#fef3c7"
+    return "#ef4444", "#fee2e2"
+
+
+def _build_resume_text(role, resume_text, jd_kw):
+    sections = split_sections(resume_text)
+    summary = build_summary(role, sections, jd_kw)
+    skills = merge_skills(sections, jd_kw)
+    exp_bullets = bullets_from_text(sections.get("experience", ""))
+    proj_bullets = bullets_from_text(sections.get("projects", ""))
+    edu_bullets = bullets_from_text(sections.get("education", ""), max_items=3)
+    cert_bullets = bullets_from_text(sections.get("certifications", ""), max_items=3)
+    if not exp_bullets:
+        exp_bullets = ["Academic or internship experience with measurable outcomes."]
+    if not proj_bullets:
+        proj_bullets = ["Project details with tech stack, role, and impact metrics."]
+    if not edu_bullets:
+        edu_bullets = ["Degree, Institution, Graduation Year, Relevant Coursework."]
+    name_contact = sections.get("name & contact", "").strip() or "Candidate Name | Phone | Email | LinkedIn | GitHub"
+    sep = "=" * 60
+    lines = [
+        sep,
+        f"  TARGET ROLE: {role.upper()}",
+        sep, "",
+        "CONTACT",
+        "-" * 40,
+        name_contact, "",
+        "PROFESSIONAL SUMMARY",
+        "-" * 40,
+        summary, "",
+        "SKILLS",
+        "-" * 40,
+        ", ".join(skills) if skills else "Python, SQL, Communication, Problem Solving", "",
+        "EXPERIENCE",
+        "-" * 40,
+    ]
+    lines += [f"  • {b}" for b in exp_bullets]
+    lines += ["", "PROJECTS", "-" * 40]
+    lines += [f"  • {b}" for b in proj_bullets]
+    lines += ["", "EDUCATION", "-" * 40]
+    lines += [f"  • {b}" for b in edu_bullets]
+    if cert_bullets:
+        lines += ["", "CERTIFICATIONS", "-" * 40]
+        lines += [f"  • {b}" for b in cert_bullets]
+    lines += ["", sep]
+    return "\n".join(lines)
 
 
 def render_resume_checker():
-    st.markdown("""
-    <style>
-        .score-container {
-            background: linear-gradient(135deg, rgba(46,204,113,0.1), rgba(46,204,113,0.05));
-            border: 2px solid rgba(46,204,113,0.3);
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: center;
-        }
-        .score-number {
-            font-size: 3rem;
-            font-weight: 800;
-            color: #2ee06f;
-        }
-        .score-label {
-            font-size: 0.9rem;
-            color: #a0b0a8;
-            margin-top: 8px;
-        }
-        .insight-box {
-            background: rgba(15, 61, 43, 0.8);
-            border-left: 4px solid #2ee06f;
-            padding: 14px;
-            margin: 10px 0;
-            border-radius: 6px;
-        }
-        .insight-title {
-            font-weight: 700;
-            color: #2ee06f;
-            font-size: 0.95rem;
-            margin-bottom: 8px;
-        }
-        .insight-item {
-            color: #c0d0c8;
-            font-size: 0.9rem;
-            margin: 6px 0;
-            padding-left: 12px;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("### 📄 Resume Analyzer")
-    st.markdown("*Upload your resume to get AI-powered ATS scoring and actionable feedback*")
-
+    st.markdown('<p class="page-title">📄 Resume Analyzer</p><p class="page-sub">AI-powered ATS scoring with actionable improvement insights</p>', unsafe_allow_html=True)
     col1, col2 = st.columns([2, 1])
     with col1:
-        resume_file = st.file_uploader("📤 Upload Resume", type=["pdf", "docx", "txt"], label_visibility="collapsed")
+        resume_file = st.file_uploader("Upload Resume (PDF / DOCX / TXT)", type=["pdf", "docx", "txt"])
     with col2:
-        job_role = st.text_input("🎯 Target Role (optional)", label_visibility="collapsed", placeholder="e.g., Senior Developer")
-
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        run_analysis = st.button("🔍 Analyze", type="primary", use_container_width=True)
-    
+        job_role = st.text_input("Target Role (optional)", placeholder="e.g. Data Scientist")
+    _, mid, _ = st.columns([1, 1, 1])
+    with mid:
+        run_analysis = st.button("🔍 Analyze Resume", type="primary", use_container_width=True)
     if not run_analysis:
         return
-
-    resume_text = extract_resume_text(resume_file)
-    has_role = bool(job_role.strip())
-    job_description = ""
-    has_jd = False
-
     if not resume_file:
         st.error("❌ Please upload a resume file.")
         return
+    resume_text = extract_resume_text(resume_file)
     if not resume_text:
         st.error("❌ Could not extract text. Try a different file format.")
         return
-
-    if not has_role:
-        score, strengths, gaps, edits = general_resume_score(resume_text)
-        default_kw = {"essential": [], "preferred": [], "important": TECH_PATTERNS[:8] + SOFT_PATTERNS[:3]}
-        rewritten = format_resume("Entry-Level Professional", resume_text, default_kw)
+    has_role = bool(job_role.strip())
+    if has_role:
+        jd_kw = extract_keywords(job_role)
+        ats_score, matched_kw, missing_kw = ats_match(resume_text, jd_kw)
+        score = ats_score
+        score_label = "Job-Specific ATS Match"
+        recs = recommend_services(score, missing_kw, resume_text)
+        rewritten = _build_resume_text(job_role, resume_text, jd_kw)
+        strengths_list = [f"Matched keyword: {k}" for k in matched_kw[:5]]
+        gaps_list = [f"Missing keyword: {k}" for k in missing_kw[:5]]
+        edits_list = [f"Add '{k}' to your resume skills/experience" for k in missing_kw[:4]]
+    else:
+        score, strengths_list, gaps_list, edits_list = general_resume_score(resume_text)
+        score_label = "General ATS Score"
+        jd_kw = {"essential": [], "preferred": [], "important": TECH_PATTERNS[:8] + SOFT_PATTERNS[:3]}
         recs = recommend_services(score, [], resume_text)
-
-        render_primary_recommendation(recs)
-        
-        # Score Display
-        st.markdown(f"""
-        <div class="score-container">
-            <div class="score-number">{score}%</div>
-            <div class="score-label">ATS Compatibility Score</div>
+        rewritten = _build_resume_text("Entry-Level Professional", resume_text, jd_kw)
+        matched_kw, missing_kw = [], []
+    ring_color, _ = _score_color(score)
+    ring_bg = f"conic-gradient({ring_color} {score * 3.6}deg, rgba(255,255,255,0.06) 0deg)"
+    st.markdown(f"""
+    <div class="score-ring-wrap">
+        <div style="width:160px;height:160px;border-radius:50%;background:{ring_bg};display:flex;align-items:center;justify-content:center;">
+            <div style="width:120px;height:120px;border-radius:50%;background:#080f1f;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <div style="font-size:2rem;font-weight:900;color:#f1f5f9">{score}%</div>
+                <div style="font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1px">{score_label}</div>
+            </div>
         </div>
-        """, unsafe_allow_html=True)
-        
-        # Results in two columns
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### ✅ Strengths")
-            for item in strengths:
-                st.markdown(f"""
-                <div class="insight-box">
-                    <div class="insight-item">✓ {item}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("### ⚠️ Gaps")
-            for item in gaps:
-                st.markdown(f"""
-                <div class="insight-box" style="border-left-color: #ff9800;">
-                    <div class="insight-item">✗ {item}</div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("### 💡 What to Improve")
-            for item in edits:
-                st.markdown(f"""
-                <div class="insight-box" style="border-left-color: #ffc107;">
-                    <div class="insight-item">→ {item}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            if recs:
-                st.markdown("### 🎯 Recommended Services")
-                for name, reason in recs:
-                    st.markdown(f"""
-                    <div class="insight-box" style="border-left-color: #2ee06f;">
-                        <div class="insight-title">{name}</div>
-                        <div class="insight-item">{reason}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-        st.divider()
-        st.markdown("### 📝 ATS-Optimized Resume")
-        st.markdown("*Below is your resume rewritten for maximum ATS compatibility*")
-        st.text_area("", rewritten, height=300, disabled=True, label_visibility="collapsed")
-        
-        col1, col2, col3 = st.columns([1, 1, 2])
-        with col1:
-            st.download_button(
-                "⬇️ Download (.txt)",
-                rewritten,
-                file_name="certhub_optimized_resume.txt",
-                use_container_width=True
-            )
+    </div>""", unsafe_allow_html=True)
+    render_primary_recommendation(recs)
+    t1, t2, t3, t4 = st.tabs(["✅ Strengths", "⚠️ Gaps", "💡 Improvements", "📝 Optimized Resume"])
+    with t1:
+        if strengths_list:
+            for item in strengths_list:
+                st.markdown(f'<div class="insight-success">✓ {item}</div>', unsafe_allow_html=True)
+        else:
+            st.info("Upload a more detailed resume for strength analysis.")
+    with t2:
+        for item in gaps_list:
+            cls = "insight-danger" if "CRITICAL" in item else "insight-warn"
+            st.markdown(f'<div class="{cls}">✗ {item}</div>', unsafe_allow_html=True)
+    with t3:
+        for item in edits_list:
+            st.markdown(f'<div class="insight-info">→ {item}</div>', unsafe_allow_html=True)
+    with t4:
+        st.markdown("**ATS-Optimized Resume** — structured for maximum compatibility:")
+        st.text_area("Optimized Resume", rewritten, height=420, key="resume_out")
+        st.download_button("⬇️ Download (.txt)", rewritten, file_name="certhub_ats_resume.txt", use_container_width=False)
 
 
 def render_dashboard(user):
     render_hero()
-    st.markdown(f"## 👋 Welcome back, {user['name']}!")
-    st.markdown("Your complete career growth platform in one place")
-    
-    st.markdown("---")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, rgba(46,204,113,0.15), rgba(46,204,113,0.05)); 
-                    border: 2px solid rgba(46,204,113,0.3); border-radius: 12px; padding: 20px; text-align: center;">
-            <div style="font-size: 2.5rem; font-weight: 800; color: #2ee06f;">""" + str(len(SERVICES)) + """</div>
-            <div style="color: #a0b0a8; margin-top: 8px;">Professional Services</div>
+    avatar = user["name"][0].upper()
+    st.markdown(f"""
+    <div class="premium-card" style="display:flex;align-items:center;gap:16px;padding:20px 24px">
+        <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#6C63FF,#00D4FF);display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:900;color:#fff;flex-shrink:0">{avatar}</div>
+        <div>
+            <div style="font-size:1.2rem;font-weight:700;color:#f1f5f9">Welcome back, {user['name']}! 👋</div>
+            <div style="font-size:.85rem;color:#64748b">{user['email']} · {user.get('country','Other')}</div>
         </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, rgba(52,152,219,0.15), rgba(52,152,219,0.05)); 
-                    border: 2px solid rgba(52,152,219,0.3); border-radius: 12px; padding: 20px; text-align: center;">
-            <div style="font-size: 2.5rem; font-weight: 800; color: #3498db;">""" + str(len(NOTES)) + """</div>
-            <div style="color: #a0b0a8; margin-top: 8px;">Study Notes</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, rgba(155,89,182,0.15), rgba(155,89,182,0.05)); 
-                    border: 2px solid rgba(155,89,182,0.3); border-radius: 12px; padding: 20px; text-align: center;">
-            <div style="font-size: 2.5rem; font-weight: 800; color: #9b59b6;">🚀</div>
-            <div style="color: #a0b0a8; margin-top: 8px;">Payment Ready</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    st.markdown("### 🚀 Quick Actions")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📄 Check Your Resume", use_container_width=True, key="dash_resume"):
-            st.session_state["page"] = "Resume Checker"
-            st.rerun()
-    with col2:
+    </div>""", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    stats = [(str(len(SERVICES)), "Expert Services"), (str(len(NOTES)), "Study Notes"), ("2,000+", "Students Helped"), ("4.9★", "Avg Rating")]
+    for col, (num, lbl) in zip([c1, c2, c3, c4], stats):
+        with col:
+            st.markdown(f'<div class="stat-card"><div class="stat-number">{num}</div><div class="stat-label">{lbl}</div></div>', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("### ⚡ Quick Actions")
+    qa1, qa2, qa3, qa4 = st.columns(4)
+    with qa1:
+        if st.button("📄 Analyze Resume", use_container_width=True, key="dash_resume"):
+            st.session_state["page"] = "Resume Checker"; st.rerun()
+    with qa2:
         if st.button("🛍️ Browse Services", use_container_width=True, key="dash_services"):
+            st.session_state["page"] = "Services"; st.rerun()
+    with qa3:
+        if st.button("📚 Study Notes", use_container_width=True, key="dash_notes"):
+            st.session_state["page"] = "Notes Store"; st.rerun()
+    with qa4:
+        st.link_button("📧 Contact Support", f"mailto:{CONTACT_EMAIL}", use_container_width=True)
+    st.markdown("---")
+    render_how_it_works()
+    st.markdown("---")
+    st.markdown("### 🌟 Featured Service")
+    import random
+    feat = random.choice(SERVICES)
+    fc1, fc2 = st.columns([2, 1])
+    with fc1:
+        st.markdown(f"""
+        <div class="service-card">
+            <div class="service-name">{feat['name']} <span class="hot-badge">🔥 HOT</span></div>
+            <div style="margin:6px 0"><span class="orig-price">₹{feat['original_price']}</span><span class="offer-price">₹{feat['offer_price']}</span><span class="delivery-badge">⚡ {feat['delivery_time']}</span></div>
+            <div style="color:#94a3b8;font-size:.88rem">{feat['description']}</div>
+            <div class="best-for-pill">🎯 {feat['best_for']}</div>
+        </div>""", unsafe_allow_html=True)
+    with fc2:
+        if st.button("🛍️ Get This Service", use_container_width=True, key="feat_svc"):
+            st.session_state["selected_service"] = feat["name"]
             st.session_state["page"] = "Services"
             st.rerun()
-    
+        st.link_button("📧 Contact Us", f"mailto:{CONTACT_EMAIL}", use_container_width=True)
     st.markdown("---")
-    st.markdown(f"📞 **{CONTACT_TEXT}**")
+    render_testimonials()
+    st.markdown(f'<div class="footer-bar">📞 {CONTACT_TEXT} &nbsp;|&nbsp; 🌐 <a href="mailto:{CONTACT_EMAIL}" style="color:#818cf8">itscerthub@gmail.com</a> &nbsp;|&nbsp; Built with ❤️ for career growth</div>', unsafe_allow_html=True)
+
+
+def render_profile(user):
+    st.markdown('<p class="page-title">👤 Profile</p><p class="page-sub">Manage your account details</p>', unsafe_allow_html=True)
+    avatar = user["name"][0].upper()
+    st.markdown(f"""
+    <div class="premium-card" style="display:flex;align-items:center;gap:16px">
+        <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#6C63FF,#00D4FF);display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:900;color:#fff">{avatar}</div>
+        <div><div style="font-size:1.2rem;font-weight:700;color:#f1f5f9">{user['name']}</div>
+        <div style="color:#64748b">{user['email']}</div></div>
+    </div>""", unsafe_allow_html=True)
+    t1, t2, t3 = st.tabs(["✏️ Edit Profile", "🔒 Change Password", "💳 Payment Info"])
+    with t1:
+        with st.form("edit_profile"):
+            new_name = st.text_input("Full Name", value=user["name"])
+            new_country = st.selectbox("Country", ["India", "Malaysia", "Other"], index=["India","Malaysia","Other"].index(user.get("country","Other")))
+            if st.form_submit_button("Save Changes", type="primary", use_container_width=True):
+                update_user(user["email"], new_name, new_country)
+                st.session_state["auth_user"]["name"] = new_name
+                st.session_state["auth_user"]["country"] = new_country
+                st.success("✅ Profile updated!")
+                st.rerun()
+    with t2:
+        with st.form("change_pw"):
+            old_pw = st.text_input("Current Password", type="password")
+            new_pw = st.text_input("New Password", type="password", placeholder="Min 8 characters")
+            if st.form_submit_button("Change Password", type="primary", use_container_width=True):
+                if len(new_pw) < 8:
+                    st.error("❌ New password must be at least 8 characters.")
+                else:
+                    ok, msg = change_password(user["email"], old_pw, new_pw)
+                    st.success(f"✅ {msg}") if ok else st.error(f"❌ {msg}")
+    with t3:
+        key_id, key_secret = get_razorpay_credentials()
+        st.code(f"Razorpay Key ID: {key_id}")
+        if key_secret:
+            st.success("✅ Razorpay configured. Dynamic payment links enabled.")
+        else:
+            st.warning("⚠️ Razorpay secret missing. Add RAZORPAY_KEY_SECRET to Streamlit secrets.")
+        st.write(CONTACT_TEXT)
+
+
+def render_admin_dashboard():
+    st.markdown('<p class="page-title">🛡️ Admin Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<span class="admin-badge">ADMIN</span>', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    total_users = get_user_count()
+    all_users = get_all_users()
+    countries = set(r[3] for r in all_users if r[3])
+    c1, c2, c3 = st.columns(3)
+    for col, (num, lbl) in zip([c1, c2, c3], [(total_users,"Total Users"),(len(countries),"Countries"),(len(SERVICES),"Services Listed")]):
+        with col:
+            st.markdown(f'<div class="admin-stat"><div class="stat-number">{num}</div><div class="stat-label">{lbl}</div></div>', unsafe_allow_html=True)
+    st.markdown("### 🕐 Recent Sign-Ups")
+    for row in all_users[:10]:
+        _, name, email, country, created = row
+        st.markdown(f'<div class="insight-info">👤 <b>{name}</b> · {email} · {country} · <span style="color:#475569">{created[:10]}</span></div>', unsafe_allow_html=True)
+
+
+def render_admin_users():
+    st.markdown('<p class="page-title">👥 User Management</p><p class="page-sub">View, edit and delete user accounts</p>', unsafe_allow_html=True)
+    all_users = get_all_users()
+    search = st.text_input("🔍 Search by name or email", placeholder="Type to filter...")
+    filtered = [r for r in all_users if not search or search.lower() in r[1].lower() or search.lower() in r[2].lower()]
+    csv_data = io.StringIO()
+    writer = csv.writer(csv_data)
+    writer.writerow(["ID","Name","Email","Country","Joined"])
+    writer.writerows(filtered)
+    st.download_button("⬇️ Export CSV", csv_data.getvalue(), "certhub_users.csv", "text/csv")
+    st.markdown(f"**{len(filtered)} users**")
+    for row in filtered:
+        uid, name, email, country, created = row
+        if email.lower() == ADMIN_EMAIL.lower():
+            continue
+        with st.expander(f"👤 {name} — {email} ({country})"):
+            st.caption(f"Joined: {created[:10]}")
+            ecol1, ecol2, ecol3 = st.columns([2, 1, 1])
+            with ecol1:
+                new_name = st.text_input("Name", value=name, key=f"name_{uid}")
+                new_country = st.selectbox("Country", ["India","Malaysia","Other"], index=["India","Malaysia","Other"].index(country) if country in ["India","Malaysia","Other"] else 2, key=f"country_{uid}")
+            with ecol2:
+                if st.button("💾 Save", key=f"save_{uid}", use_container_width=True):
+                    update_user(email, new_name, new_country)
+                    st.success("✅ Updated")
+                    st.rerun()
+            with ecol3:
+                if st.button("🗑️ Delete", key=f"del_{uid}", use_container_width=True, type="secondary"):
+                    if st.session_state.get(f"confirm_del_{uid}"):
+                        delete_user(email)
+                        st.success(f"Deleted {email}")
+                        st.rerun()
+                    else:
+                        st.session_state[f"confirm_del_{uid}"] = True
+                        st.warning("Click Delete again to confirm.")
 
 
 def main():
-    st.set_page_config(page_title=APP_NAME, page_icon=":briefcase:", layout="wide")
+    st.set_page_config(page_title=APP_NAME, page_icon="🚀", layout="wide")
     inject_theme()
     init_db()
-
-    if "auth_user" not in st.session_state:
-        st.session_state["auth_user"] = None
-    if "page" not in st.session_state:
-        st.session_state["page"] = "Dashboard"
-    if "selected_service" not in st.session_state:
-        st.session_state["selected_service"] = None
-
+    for k, v in [("auth_user", None), ("page", "Dashboard"), ("selected_service", None)]:
+        if k not in st.session_state:
+            st.session_state[k] = v
     user = st.session_state["auth_user"]
     if not user:
         render_auth()
         return
-
+    is_admin = user.get("email","").lower() == ADMIN_EMAIL.lower()
+    user_pages = ["Dashboard", "Resume Checker", "Services", "Notes Store", "Profile"]
+    admin_pages = ["Admin Dashboard", "User Management"]
+    pages = user_pages + (admin_pages if is_admin else [])
     with st.sidebar:
-        st.markdown(f"**{APP_NAME}**")
+        st.markdown(f'<div style="font-size:1.3rem;font-weight:900;background:linear-gradient(135deg,#6C63FF,#00D4FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px">🚀 {APP_NAME}</div>', unsafe_allow_html=True)
+        if is_admin:
+            st.markdown('<span class="admin-badge">ADMIN</span>', unsafe_allow_html=True)
         st.caption(user["email"])
-        pages = ["Dashboard", "Resume Checker", "Services", "Notes Store", "Profile"]
+        st.markdown("---")
         current_page = st.session_state.get("page", "Dashboard")
         if current_page not in pages:
             current_page = "Dashboard"
-        page = st.radio("Navigate", pages, index=pages.index(current_page))
+        page = st.radio("Navigation", pages, index=pages.index(current_page), label_visibility="collapsed")
         st.session_state["page"] = page
-        if st.button("Sign Out", use_container_width=True):
-            st.session_state["auth_user"] = None
+        st.markdown("---")
+        if st.button("🚪 Sign Out", use_container_width=True):
+            for k in ["auth_user", "selected_service"]:
+                st.session_state[k] = None
             st.session_state["page"] = "Dashboard"
-            st.session_state["selected_service"] = None
             st.rerun()
-
+        st.markdown(f'<p style="color:#475569;font-size:.75rem;text-align:center;margin-top:8px">{CONTACT_TEXT}</p>', unsafe_allow_html=True)
     if page == "Dashboard":
         render_dashboard(user)
     elif page == "Resume Checker":
@@ -1497,25 +1581,12 @@ def main():
         render_service_cards()
     elif page == "Notes Store":
         render_notes_store()
-    else:
-        st.subheader("Profile")
-        st.write(f"Name: {user['name']}")
-        st.write(f"Email: {user['email']}")
-        key_id, key_secret = get_razorpay_credentials()
-        st.write("Payment Settings")
-        st.code(f"Razorpay Key ID: {key_id}")
-        if key_secret:
-            st.success("Razorpay secret is configured. Fixed-amount payment links are enabled.")
-        else:
-            st.warning("Razorpay secret is missing. Configure `RAZORPAY_KEY_SECRET` in Streamlit secrets for fixed checkout.")
-            st.code(
-                "[secrets]\n"
-                "RAZORPAY_KEY_ID = \"rzp_live_RJNwYg2Jx647o8\"\n"
-                "RAZORPAY_KEY_SECRET = \"your_live_secret_here\""
-            )
-        st.write("Fallback Payment Link:")
-        st.code(RAZORPAY_LINK)
-        st.write(CONTACT_TEXT)
+    elif page == "Profile":
+        render_profile(user)
+    elif page == "Admin Dashboard":
+        render_admin_dashboard()
+    elif page == "User Management":
+        render_admin_users()
 
 
 if __name__ == "__main__":
